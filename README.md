@@ -2,6 +2,7 @@
 
 This project was created to follow [6502 kit project](https://eater.net/6502) by Ben Eater 
 
+```
 ╔════════════════════╗
 ║    w65c02 (CPU)    ║
 ╚════╤═════════╦═════╝
@@ -26,3 +27,4 @@ This project was created to follow [6502 kit project](https://eater.net/6502) by
  ┌───┴────┐ ┌───┴────┐
  │ port a │ │ port b │
  └───┬────┘ └───┬────┘
+```
