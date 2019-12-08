@@ -1,9 +1,21 @@
   .org $8000
 
 reset:
-  lda #$ff
+  lda #$e1
   sta $6003
+  lda #$ff
   sta $6002
+
+  lda $600f
+  sta $00
+  lda #$02
+  sta $01
+  lda #$04
+  sta $02
+  lda #$08
+  sta $03
+  lda #$10
+  sta $04
 
 loop:
   lda #$00
@@ -13,31 +25,22 @@ loop:
   ldx #$38
   jsr print
 
-  ldx #$0f
+  ldx #$0c
   jsr print
 
   ldx #$06
   jsr print
 
   lda #$20
-  ldx #$53
+  ldx #$24
   jsr print
 
-  ldx #$65
+  ldx #$3e
   jsr print
 
-  ldx #$72
-  jsr print
-
-  ldx #$67
-  jsr print
-
-  ldx #$65
-  jsr print
-
-  ldx #$79
-  jsr print
-
+  lda $600f
+  cmp $00
+  bne type
   jmp loop
 
 print:
@@ -49,6 +52,16 @@ print:
   pla
   sta $600f
   rts
+
+type:
+  bit $01
+  beq led
+  jmp loop
+
+led:
+  lda #$01
+  sta $600f
+  jmp loop
 
   .org $fffc
   .word reset
