@@ -1,5 +1,6 @@
 rwa .equ $600f
 rwb .equ $6000
+btnstate .equ $3000
 
   .org $8000
 
@@ -10,7 +11,7 @@ reset:
   sta $6002
 
   lda rwa
-  sta $00
+  sta btnstate
 
 loop:
   lda #$02
@@ -32,12 +33,13 @@ loop:
   jsr lcdprnt
 
   lda rwa
-  cmp $00
+  cmp btnstate
   bne type
   jmp loop
 
 lcddir:
   pha
+  pha
   lda lcdsys
   sta rwa
   ora lcde
@@ -46,9 +48,11 @@ lcddir:
   sta rwb
   lda lcdsys
   sta rwa
+  pla
   rts
 
 lcdprnt:
+  pha
   pha
   lda lcdtxt
   sta rwa
@@ -58,6 +62,7 @@ lcdprnt:
   sta rwb
   lda lcdtxt
   sta rwa
+  pla
   rts
 
 type:
@@ -76,7 +81,6 @@ led:
   sta rwa
   jmp loop
 
-  .org $f000
 lcdsys:
   .byte $00
 lcdtxt:
@@ -84,7 +88,6 @@ lcdtxt:
 lcde:
   .byte $80
 
-  .org $f100
 btnup:
   .byte $02
 btndown:
