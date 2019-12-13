@@ -1,3 +1,6 @@
+rwa .equ $600f
+rwb .equ $6000
+
   .org $8000
 
 reset:
@@ -6,62 +9,90 @@ reset:
   lda #$ff
   sta $6002
 
-  lda $600f
+  lda rwa
   sta $00
-  lda #$02
-  sta $01
-  lda #$04
-  sta $02
-  lda #$08
-  sta $03
-  lda #$10
-  sta $04
 
 loop:
-  lda #$00
-  ldx #$02
-  jsr print
+  lda #$02
+  jsr lcddir
 
-  ldx #$38
-  jsr print
+  lda #$38
+  jsr lcddir
 
-  ldx #$0c
-  jsr print
+  lda #$0c
+  jsr lcddir
 
-  ldx #$06
-  jsr print
+  lda #$06
+  jsr lcddir
 
-  lda #$20
-  ldx #$24
-  jsr print
+  lda #$24
+  jsr lcdprnt
 
-  ldx #$3e
-  jsr print
+  lda #$3e
+  jsr lcdprnt
 
-  lda $600f
+  lda rwa
   cmp $00
   bne type
   jmp loop
 
-print:
-  sta $600f
+lcddir:
   pha
-  ora #$80
-  sta $600f
-  stx $6000
+  lda lcdsys
+  sta rwa
+  ora lcde
+  sta rwa
   pla
-  sta $600f
+  sta rwb
+  lda lcdsys
+  sta rwa
+  rts
+
+lcdprnt:
+  pha
+  lda lcdtxt
+  sta rwa
+  ora lcde
+  sta rwa
+  pla
+  sta rwb
+  lda lcdtxt
+  sta rwa
   rts
 
 type:
-  bit $01
+  bit btnup
+  beq led
+  bit btndown
+  beq led
+  bit btnleft
+  beq led
+  bit btnright
   beq led
   jmp loop
 
 led:
   lda #$01
-  sta $600f
+  sta rwa
   jmp loop
+
+  .org $f000
+lcdsys:
+  .byte $00
+lcdtxt:
+  .byte $20
+lcde:
+  .byte $80
+
+  .org $f100
+btnup:
+  .byte $02
+btndown:
+  .byte $04
+btnleft:
+  .byte $08
+btnright:
+  .byte $10
 
   .org $fffc
   .word reset
