@@ -21,13 +21,18 @@ reset:
   jsr waitms
   lda #$38
   jsr lcddir
-  lda #$ff
+  lda #$0f
   jsr waitms
   lda #$38
   jsr lcddir
-  lda #$ff
+  lda #$0f
   jsr waitms
 
+  lda #$01
+  jsr lcddir
+  lda #$01
+  jsr waitms
+  jsr lcdbusy
   lda #$0f
   jsr lcddir
   jsr lcdbusy
