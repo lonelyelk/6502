@@ -10,22 +10,19 @@ reset:
   lda #$ff
   sta $6002
 
-  lda rwa
-  sta btnstate
-
-  lda #$ff
-  jsr waitms
-  lda #$38
-  jsr lcddir
-  lda #$ff
-  jsr waitms
-  lda #$38
-  jsr lcddir
   lda #$0f
   jsr waitms
   lda #$38
   jsr lcddir
-  lda #$0f
+  lda #$05
+  jsr waitms
+  lda #$38
+  jsr lcddir
+  lda #$01
+  jsr waitms
+  lda #$38
+  jsr lcddir
+  lda #$01
   jsr waitms
 
   lda #$01
@@ -45,26 +42,58 @@ reset:
 
   lda #$24
   jsr lcdprnt
-  jsr lcdbusy
 
   lda #$3e
   jsr lcdprnt
-  jsr lcdbusy
+
+  lda rwa
+  and btnmask
+  sta btnstate
 
 loop:
   lda rwa
+  and btnmask
   cmp btnstate
   beq loop
   sta btnstate
+  lda #$09
+  jsr waitms
+  lda rwa
+  and btnmask
+  cmp btnstate
+  bne loop
   bit btnup
-  bne nobtn
+  bne noupbtn
   lda #$55
   jsr lcdprnt
-  jsr lcdbusy
   lda #$01
   sta rwa
   jmp loop
-nobtn:
+noupbtn:
+  bit btndown
+  bne nodownbtn
+  lda #$44
+  jsr lcdprnt
+  lda #$01
+  sta rwa
+  jmp loop
+nodownbtn:
+  bit btnleft
+  bne noleftbtn
+  lda #$4c
+  jsr lcdprnt
+  lda #$01
+  sta rwa
+  jmp loop
+noleftbtn:
+  bit btnright
+  bne norightbtn
+  lda #$52
+  jsr lcdprnt
+  lda #$01
+  sta rwa
+  jmp loop
+norightbtn:
   lda #$00
   sta rwa
   jmp loop
@@ -105,6 +134,7 @@ lcdprnt:
   sta rwb
   lda lcdtxt
   sta rwa
+  jsr lcdbusy
   pla
   rts
 
@@ -142,6 +172,8 @@ btnleft:
   .byte $08
 btnright:
   .byte $10
+btnmask:
+  .byte $1e
 
   .org $fffc
   .word reset
