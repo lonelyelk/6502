@@ -13,29 +13,67 @@ reset:
   lda rwa
   sta btnstate
 
-loop:
-  lda #$02
-  jsr lcddir
-
+  lda #$ff
+  jsr waitms
   lda #$38
   jsr lcddir
-
-  lda #$0c
+  lda #$ff
+  jsr waitms
+  lda #$38
   jsr lcddir
+  lda #$ff
+  jsr waitms
+  lda #$38
+  jsr lcddir
+  lda #$ff
+  jsr waitms
 
+  lda #$0f
+  jsr lcddir
+  jsr lcdbusy
+  lda #$02
+  jsr lcddir
+  jsr lcdbusy
   lda #$06
   jsr lcddir
+  jsr lcdbusy
 
   lda #$24
   jsr lcdprnt
+  jsr lcdbusy
 
   lda #$3e
   jsr lcdprnt
+  jsr lcdbusy
 
+loop:
   lda rwa
   cmp btnstate
-  bne type
+  beq loop
+  sta btnstate
+  bit btnup
+  bne nobtn
+  lda #$55
+  jsr lcdprnt
+  jsr lcdbusy
+  lda #$01
+  sta rwa
   jmp loop
+nobtn:
+  lda #$00
+  sta rwa
+  jmp loop
+
+waitms:
+  tay
+waitloop0:
+  ldx #$ff
+waitloop1:
+  dex
+  bne waitloop1
+  dey
+  bne waitloop0
+  rts
 
 lcddir:
   pha
@@ -65,21 +103,22 @@ lcdprnt:
   pla
   rts
 
-type:
-  bit btnup
-  beq led
-  bit btndown
-  beq led
-  bit btnleft
-  beq led
-  bit btnright
-  beq led
-  jmp loop
-
-led:
-  lda #$01
+lcdbusy:
+  pha
+  lda #$7f
+  sta $6002
+lcdbusyloop0:
+  lda lcdrw
   sta rwa
-  jmp loop
+  ora lcde
+  sta rwa
+  lda rwb
+  and #$80
+  bne lcdbusyloop0
+  lda #$ff
+  sta $6002
+  pla
+  rts
 
 lcdsys:
   .byte $00
@@ -87,6 +126,8 @@ lcdtxt:
   .byte $20
 lcde:
   .byte $80
+lcdrw:
+  .byte $40
 
 btnup:
   .byte $02
