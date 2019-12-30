@@ -16,13 +16,6 @@ reset:
   lda #%11111111 ; LCD data
   sta via_dir_b
 
-  lda #$00
-  sta acia_stat
-  lda #%00001011 ; ACIA: no parity; no echo; no irq
-  sta acia_comm
-  lda #%00011110 ; ACIA: 1 stop bit; 8 bit words; 9600 baud rate
-  sta acia_ctrl
-
   lda #$0f
   jsr waitms
   lda #%00111000 ; LCD: 8 bit; 2 lines; 5x8 dots
@@ -59,6 +52,13 @@ reset:
   lda #">"
   jsr lcdprnt
 
+  ;;lda #$00
+  ;;sta acia_stat
+  ;;lda #%00000000 ; ACIA: 1 stop bit; 8 bit words; 16x /(- 9600 baud rate)
+  ;;sta acia_ctrl
+  ;;lda #%11001111 ; ACIA: no parity; no echo; no irq
+  ;;sta acia_comm
+
   lda via_data_a
   and btnmask
   sta btn_state_cache
@@ -82,6 +82,8 @@ loop:
   jsr lcdprnt
   lda #$01
   sta via_data_a
+  ;;lda acia_data
+  ;;jsr lcdprntbin
   jmp loop
 noupbtn:
   bit btndown
@@ -91,24 +93,8 @@ noupbtn:
   jsr lcdprnt
   lda #$01
   sta via_data_a
-  lda acia_stat
-  ldx #$08
-statusloop:
-  asl
-  bcc printzero
-  pha
-  lda #"1"
-  jsr lcdprnt
-  pla
-  jmp statusloop0
-printzero:
-  pha
-  lda #"0"
-  jsr lcdprnt
-  pla
-statusloop0:
-  dex
-  bne statusloop
+  ;;lda acia_stat
+  ;;jsr lcdprntbin
   jmp loop
 nodownbtn:
   bit btnleft
@@ -118,6 +104,8 @@ nodownbtn:
   jsr lcdprnt
   lda #$01
   sta via_data_a
+  ;;lda acia_comm
+  ;;jsr lcdprntbin
   jmp loop
 noleftbtn:
   bit btnright
@@ -127,11 +115,35 @@ noleftbtn:
   jsr lcdprnt
   lda #$01
   sta via_data_a
+  ;;lda acia_ctrl
+  ;;jsr lcdprntbin
   jmp loop
 norightbtn:
   lda #$00
   sta via_data_a
   jmp loop
+
+lcdprntbin:
+  pha
+  ldx #$08
+shiftloop:
+  asl
+  bcc printzero
+  pha
+  lda #"1"
+  jsr lcdprnt
+  pla
+  jmp shiftloop0
+printzero:
+  pha
+  lda #"0"
+  jsr lcdprnt
+  pla
+shiftloop0:
+  dex
+  bne shiftloop
+  pla
+  rts
 
 waitms:
   tay
