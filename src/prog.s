@@ -60,10 +60,11 @@ reset:
 
   lda #$00
   tax
-setupcharloop:
   ora lcdcgram
   jsr lcddir
   jsr lcdbusy
+  txa
+setupcharloop:
   lda lcdromb, X
   jsr lcdprnt
   inx
@@ -71,13 +72,8 @@ setupcharloop:
   cmp lcdsymheight
   bne setupcharloop
 
-  lda #$00
-  tax
+  ldx #$00
 setupcharloop1:
-  ora lcdcgram
-  ora #$01
-  jsr lcddir
-  jsr lcdbusy
   lda lcdelk, X
   jsr lcdprnt
   inx
@@ -85,18 +81,25 @@ setupcharloop1:
   cmp lcdsymheight
   bne setupcharloop1
 
+  lda lcdbusyflag
+  jsr lcddir
+  jsr lcdbusy
+
   lda #%00000010 ; LCD: home
   jsr lcddir
   jsr lcdbusy
 
   lda #$00
   jsr lcdprnt
+  jsr lcdlinesfix
 
   lda #$01
   jsr lcdprnt
+  jsr lcdlinesfix
 
   lda #">"
   jsr lcdprnt
+  jsr lcdlinesfix
 
   ;;lda #$00
   ;;sta acia_stat
@@ -126,6 +129,7 @@ loop:
   lda #"u"
   ;;sta acia_data
   jsr lcdprnt
+  jsr lcdlinesfix
   sta via_sr
   wai
   lda #$01
@@ -139,6 +143,7 @@ noupbtn:
   lda #"d"
   ;;sta acia_data
   jsr lcdprnt
+  jsr lcdlinesfix
   sta via_sr
   wai
   lda #$01
@@ -152,6 +157,7 @@ nodownbtn:
   lda #"l"
   ;;sta acia_data
   jsr lcdprnt
+  jsr lcdlinesfix
   sta via_sr
   wai
   lda #$01
@@ -165,6 +171,7 @@ noleftbtn:
   lda #"r"
   ;;sta acia_data
   jsr lcdprnt
+  jsr lcdlinesfix
   sta via_sr
   wai
   lda #$01
@@ -186,12 +193,14 @@ shiftloop:
   pha
   lda #"1"
   jsr lcdprnt
+  jsr lcdlinesfix
   pla
   jmp shiftloop0
 printzero:
   pha
   lda #"0"
   jsr lcdprnt
+  jsr lcdlinesfix
   pla
 shiftloop0:
   dex
@@ -255,6 +264,11 @@ lcdbusyloop0:
   sta lcd_address_counter
   lda #%11111111 ; LCD make all write only
   sta via_dir_b
+  pla
+  rts
+
+lcdlinesfix:
+  pha
   lda lcd_address_counter
   cmp lcdline12
   beq lcdchangeline12
