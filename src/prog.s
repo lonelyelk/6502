@@ -2,6 +2,11 @@ via_data_a .equ $600f
 via_data_b .equ $6000
 via_dir_a .equ $6003
 via_dir_b .equ $6002
+via_sr .equ $600a
+via_acr .equ $600b
+via_pcr .equ $600c
+via_ifr .equ $600d
+via_ier .equ $600e
 btn_state_cache .equ $3000
 acia_data .equ $7000
 acia_stat .equ $7001
@@ -15,6 +20,14 @@ reset:
   sta via_dir_a
   lda #%11111111 ; LCD data
   sta via_dir_b
+  lda via_sr ; VIA reset shift register
+  lda via_ier
+  ora #%00000100 ; VIA enable shift register interrupt
+  sta via_ier
+  lda via_acr
+  ora #%00011000
+  and #%11111011 ; VIA shift register mode 110
+  sta via_acr
 
   lda #$0f
   jsr waitms
@@ -78,10 +91,9 @@ loop:
   bit btnup
   bne noupbtn
   lda #"u"
-  sta acia_data
+  ;;sta acia_data
   jsr lcdprnt
-  lda #$01
-  sta via_data_a
+  sta via_sr
   ;;lda acia_data
   ;;jsr lcdprntbin
   jmp loop
@@ -89,8 +101,10 @@ noupbtn:
   bit btndown
   bne nodownbtn
   lda #"d"
-  sta acia_data
+  ;;sta acia_data
   jsr lcdprnt
+  sta via_sr
+  wai
   lda #$01
   sta via_data_a
   ;;lda acia_stat
@@ -100,10 +114,9 @@ nodownbtn:
   bit btnleft
   bne noleftbtn
   lda #"l"
-  sta acia_data
+  ;;sta acia_data
   jsr lcdprnt
-  lda #$01
-  sta via_data_a
+  sta via_sr
   ;;lda acia_comm
   ;;jsr lcdprntbin
   jmp loop
@@ -111,10 +124,9 @@ noleftbtn:
   bit btnright
   bne norightbtn
   lda #"r"
-  sta acia_data
+  ;;sta acia_data
   jsr lcdprnt
-  lda #$01
-  sta via_data_a
+  sta via_sr
   ;;lda acia_ctrl
   ;;jsr lcdprntbin
   jmp loop
@@ -187,7 +199,7 @@ lcdprnt:
 
 lcdbusy:
   pha
-  lda #%01111111
+  lda #%01111111 ; LCD allow read from pin 7 
   sta via_dir_b
 lcdbusyloop0:
   lda lcdrw
@@ -197,7 +209,7 @@ lcdbusyloop0:
   lda via_data_b
   and lcdbusyflag
   bne lcdbusyloop0
-  lda #%11111111
+  lda #%11111111 ; LCD make all write only
   sta via_dir_b
   pla
   rts
@@ -224,6 +236,16 @@ btnright:
 btnmask:
   .byte $1e
 
+isr:
+  pha
+  lda via_ifr
+  lda #"i"
+  jsr lcdprnt
+  lda #$01
+  sta via_data_a
+  pla
+  rti
+
   .org $fffc
   .word reset
-  .word $0000
+  .word isr
