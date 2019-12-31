@@ -7,11 +7,13 @@ via_acr .equ $600b
 via_pcr .equ $600c
 via_ifr .equ $600d
 via_ier .equ $600e
-btn_state_cache .equ $3000
 acia_data .equ $7000
 acia_stat .equ $7001
 acia_comm .equ $7002
 acia_ctrl .equ $7003
+
+btn_state_cache .equ $3000
+lcd_address_counter .equ $3001
 
   .org $8000
 
@@ -199,7 +201,7 @@ lcdprnt:
 
 lcdbusy:
   pha
-  lda #%01111111 ; LCD allow read from pin 7 
+  lda #%00000000 ; LCD allow read from all pins
   sta via_dir_b
 lcdbusyloop0:
   lda lcdrw
@@ -209,8 +211,37 @@ lcdbusyloop0:
   lda via_data_b
   and lcdbusyflag
   bne lcdbusyloop0
+  lda via_data_b
+  sta lcd_address_counter
   lda #%11111111 ; LCD make all write only
   sta via_dir_b
+  lda lcd_address_counter
+  cmp lcdline12
+  beq lcdchangeline12
+  cmp lcdline23
+  beq lcdchangeline23
+  cmp lcdline2
+  beq lcdchangeline2
+  jmp lcdreturn
+lcdchangeline12:
+  lda lcdline2
+  sta lcd_address_counter
+  ora lcdbusyflag
+  jsr lcddir
+  jmp lcdreturn
+lcdchangeline23:
+  lda lcdline12
+  sta lcd_address_counter
+  ora lcdbusyflag
+  jsr lcddir
+  jmp lcdreturn
+lcdchangeline2:
+  lda lcdline23
+  sta lcd_address_counter
+  ora lcdbusyflag
+  jsr lcddir
+  jmp lcdreturn
+lcdreturn:
   pla
   rts
 
@@ -224,6 +255,12 @@ lcdrw:
   .byte $40
 lcdbusyflag:
   .byte $80
+lcdline12:
+  .byte $14
+lcdline2:
+  .byte $40
+lcdline23:
+  .byte $54
 
 btnup:
   .byte $02
