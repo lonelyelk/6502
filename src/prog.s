@@ -54,14 +54,45 @@ reset:
   lda #%00001111 ; LCD: display on; cursor on; blink on
   jsr lcddir
   jsr lcdbusy
-  lda #%00000010 ; LCD: home
-  jsr lcddir
-  jsr lcdbusy
   lda #%00000110 ; LCD: increment address; no shift display
   jsr lcddir
   jsr lcdbusy
 
-  lda #"$"
+  lda #$00
+  tax
+setupcharloop:
+  ora lcdcgram
+  jsr lcddir
+  jsr lcdbusy
+  lda lcdromb, X
+  jsr lcdprnt
+  inx
+  txa
+  cmp lcdsymheight
+  bne setupcharloop
+
+  lda #$00
+  tax
+setupcharloop1:
+  ora lcdcgram
+  ora #$01
+  jsr lcddir
+  jsr lcdbusy
+  lda lcdelk, X
+  jsr lcdprnt
+  inx
+  txa
+  cmp lcdsymheight
+  bne setupcharloop1
+
+  lda #%00000010 ; LCD: home
+  jsr lcddir
+  jsr lcdbusy
+
+  lda #$00
+  jsr lcdprnt
+
+  lda #$01
   jsr lcdprnt
 
   lda #">"
@@ -96,6 +127,9 @@ loop:
   ;;sta acia_data
   jsr lcdprnt
   sta via_sr
+  wai
+  lda #$01
+  sta via_data_a
   ;;lda acia_data
   ;;jsr lcdprntbin
   jmp loop
@@ -119,6 +153,9 @@ nodownbtn:
   ;;sta acia_data
   jsr lcdprnt
   sta via_sr
+  wai
+  lda #$01
+  sta via_data_a
   ;;lda acia_comm
   ;;jsr lcdprntbin
   jmp loop
@@ -129,6 +166,9 @@ noleftbtn:
   ;;sta acia_data
   jsr lcdprnt
   sta via_sr
+  wai
+  lda #$01
+  sta via_data_a
   ;;lda acia_ctrl
   ;;jsr lcdprntbin
   jmp loop
@@ -255,12 +295,34 @@ lcdrw:
   .byte $40
 lcdbusyflag:
   .byte $80
+lcdcgram:
+  .byte $40
 lcdline12:
   .byte $14
 lcdline2:
   .byte $40
 lcdline23:
   .byte $54
+lcdelk:
+  .byte %10100
+  .byte %10100
+  .byte %01000
+  .byte %10111
+  .byte %00101
+  .byte %00101
+  .byte %00101
+  .byte %00101
+lcdromb:
+  .byte %00100
+  .byte %01010
+  .byte %10001
+  .byte %01010
+  .byte %00100
+  .byte %00000
+  .byte %00000
+  .byte %00000
+lcdsymheight:
+  .byte $08
 
 btnup:
   .byte $02
