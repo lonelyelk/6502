@@ -58,30 +58,25 @@ reset:
   jsr lcddir
   jsr lcdbusy
 
-  lda #$00
-  tax
-  ora lcdcgram
+  lda lcdcgram ; LCD: set address counter to CGRAM 00
   jsr lcddir
   jsr lcdbusy
-  txa
-setupcharloop:
-  lda lcdromb, X
-  jsr lcdprnt
-  inx
-  txa
-  cmp lcdsymheight
-  bne setupcharloop
-
+  lda lcdcharsnumber
   ldx #$00
-setupcharloop1:
-  lda lcdelk, X
+setupcharsloop:
+  ldy lcdcharheight
+  pha
+setupcharloop:
+  lda lcdchars, X
   jsr lcdprnt
   inx
-  txa
-  cmp lcdsymheight
-  bne setupcharloop1
+  dey
+  bne setupcharloop
+  pla
+  dec
+  bne setupcharsloop
 
-  lda lcdbusyflag
+  lda lcdbusyflag ; LCD: set address counter to DDRAM 00
   jsr lcddir
   jsr lcdbusy
 
@@ -90,12 +85,13 @@ setupcharloop1:
   jsr lcdbusy
 
   lda #$00
+  ldx lcdcharsnumber
+printchars:
   jsr lcdprnt
   jsr lcdlinesfix
-
-  lda #$01
-  jsr lcdprnt
-  jsr lcdlinesfix
+  inc
+  dex
+  bne printchars
 
   lda #">"
   jsr lcdprnt
@@ -317,8 +313,8 @@ lcdline2:
   .byte $40
 lcdline23:
   .byte $54
-lcdelk:
-  .byte %10100
+lcdchars:
+  .byte %10100 ;; elk
   .byte %10100
   .byte %01000
   .byte %10111
@@ -326,16 +322,65 @@ lcdelk:
   .byte %00101
   .byte %00101
   .byte %00101
-lcdromb:
-  .byte %00100
+  .byte %01110 ;; ktulhu
+  .byte %11111
+  .byte %10101
+  .byte %11111
+  .byte %11111
+  .byte %11111
+  .byte %10101
+  .byte %10101
+  .byte %00100 ;; penis
   .byte %01010
+  .byte %01110
+  .byte %01010
+  .byte %01010
+  .byte %10101
+  .byte %10101
+  .byte %01110
+  .byte %01110 ;; vagina
   .byte %10001
-  .byte %01010
+  .byte %10101
+  .byte %10101
+  .byte %10101
+  .byte %10101
+  .byte %10101
+  .byte %01110
+  .byte %10001 ;; lion
+  .byte %11111
+  .byte %10001
+  .byte %11011
+  .byte %10001
+  .byte %10101
+  .byte %01110
+  .byte %00000
+  .byte %10001 ;; cat
+  .byte %11111
+  .byte %10001
+  .byte %11011
+  .byte %10001
+  .byte %01110
+  .byte %00000
+  .byte %00000
+  .byte %11000 ;; goose
+  .byte %10100
+  .byte %11110
+  .byte %10000
+  .byte %10001
+  .byte %11111
+  .byte %10001
+  .byte %01110
+  .byte %10101 ;; babaka
+  .byte %01110
   .byte %00100
-  .byte %00000
-  .byte %00000
-  .byte %00000
-lcdsymheight:
+  .byte %01110
+  .byte %10001
+  .byte %11111
+  .byte %01001
+  .byte %11011
+lcdcharheight:
+  .byte $08
+lcdcharsnumber:
   .byte $08
 
 btnup:
