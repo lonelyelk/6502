@@ -48,33 +48,30 @@ reset:
   lda #$0f
   jsr waitms
   lda #%00111000 ; LCD: 8 bit; 2 lines; 5x8 dots
-  jsr lcddir
+  jsr lcdcommand
   lda #$05
   jsr waitms
   lda #%00111000 ; LCD: repeat 3 times
-  jsr lcddir
+  jsr lcdcommand
   lda #$01
   jsr waitms
   lda #%00111000
-  jsr lcddir
+  jsr lcdcommand
   lda #$01
   jsr waitms
 
   lda #%00000001 ; LCD: clear display
-  jsr lcddir
+  jsr lcdcommand
   lda #$01
   jsr waitms
   jsr lcdbusy
   lda #%00001111 ; LCD: display on; cursor on; blink on
-  jsr lcddir
-  jsr lcdbusy
+  jsr lcdcommandbusy
   lda #%00000110 ; LCD: increment address; no shift display
-  jsr lcddir
-  jsr lcdbusy
+  jsr lcdcommandbusy
 
   lda #lcd_cgram ; LCD: set address counter to CGRAM 00
-  jsr lcddir
-  jsr lcdbusy
+  jsr lcdcommandbusy
   lda #lcd_chars_number
   ldx #0
 setupcharsloop:
@@ -82,7 +79,7 @@ setupcharsloop:
   pha
 setupcharloop:
   lda lcdchars, X
-  jsr lcdprnt
+  jsr lcdwrite
   inx
   dey
   bne setupcharloop
@@ -91,25 +88,21 @@ setupcharloop:
   bne setupcharsloop
 
   lda #lcd_ddram ; LCD: set address counter to DDRAM 00
-  jsr lcddir
-  jsr lcdbusy
+  jsr lcdcommandbusy
 
   lda #%00000010 ; LCD: home
-  jsr lcddir
-  jsr lcdbusy
+  jsr lcdcommandbusy
 
   lda #0
   ldx #lcd_chars_number
 printcharsloop:
-  jsr lcdprnt
-  jsr lcdlinesfix
+  jsr lcdprint
   inc
   dex
   bne printcharsloop
 
   lda #">"
-  jsr lcdprnt
-  jsr lcdlinesfix
+  jsr lcdprint
 
   ;;lda #$00
   ;;sta acia_stat
@@ -138,63 +131,59 @@ loop:
   bne noupbtn
   lda #"u"
   ;;sta acia_data
-  jsr lcdprnt
-  jsr lcdlinesfix
+  jsr lcdprint
   sta via_sr
   wai
   lda #$01
   sta via_data_a
   ;;lda acia_data
-  ;;jsr lcdprntbin
+  ;;jsr lcdprintbinary
   jmp loop
 noupbtn:
   bit btndown
   bne nodownbtn
   lda #"d"
   ;;sta acia_data
-  jsr lcdprnt
-  jsr lcdlinesfix
+  jsr lcdprint
   sta via_sr
   wai
   lda #$01
   sta via_data_a
   ;;lda acia_stat
-  ;;jsr lcdprntbin
+  ;;jsr lcdprintbinary
   jmp loop
 nodownbtn:
   bit btnleft
   bne noleftbtn
   lda #"l"
   ;;sta acia_data
-  jsr lcdprnt
-  jsr lcdlinesfix
+  jsr lcdprint
   sta via_sr
   wai
   lda #$01
   sta via_data_a
   ;;lda acia_comm
-  ;;jsr lcdprntbin
+  ;;jsr lcdprintbinary
   jmp loop
 noleftbtn:
   bit btnright
   bne norightbtn
   lda #"r"
   ;;sta acia_data
-  jsr lcdprnt
-  jsr lcdlinesfix
+  jsr lcdprint
   sta via_sr
   wai
   lda #$01
   sta via_data_a
   ;;lda acia_ctrl
-  ;;jsr lcdprntbin
+  ;;jsr lcdprintbinary
   jmp loop
 norightbtn:
   lda #$00
   sta via_data_a
   jmp loop
 
-lcdprntbin:
+lcdprintbinary:
   pha
   ldx #$08
 shiftloop:
@@ -202,15 +191,13 @@ shiftloop:
   bcc printzero
   pha
   lda #"1"
-  jsr lcdprnt
-  jsr lcdlinesfix
+  jsr lcdprint
   pla
   jmp shiftloop0
 printzero:
   pha
   lda #"0"
-  jsr lcdprnt
-  jsr lcdlinesfix
+  jsr lcdprint
   pla
 shiftloop0:
   dex
@@ -229,7 +216,7 @@ waitloop1:
   bne waitloop0
   rts
 
-lcddir:
+lcdcommand:
   pha
   pha
   lda #0
@@ -243,7 +230,12 @@ lcddir:
   pla
   rts
 
-lcdprnt:
+lcdcommandbusy:
+  jsr lcdcommand
+  jsr lcdbusy
+  rts
+
+lcdwrite:
   pha
   pha
   lda #lcd_control_rs
@@ -255,6 +247,39 @@ lcdprnt:
   lda #lcd_control_rs
   sta via_data_a
   jsr lcdbusy
+  pla
+  rts
+
+lcdprint:
+  jsr lcdwrite
+  pha
+  lda lcd_address_counter
+  cmp #lcd_address_line1_middle
+  beq lcdchangeline12
+  cmp #lcd_address_line2_middle
+  beq lcdchangeline23
+  cmp #lcd_address_line2_start
+  beq lcdchangeline2
+  jmp lcdreturn
+lcdchangeline12:
+  lda #lcd_address_line2_start
+  sta lcd_address_counter
+  ora #lcd_ddram
+  jsr lcdcommand
+  jmp lcdreturn
+lcdchangeline23:
+  lda #lcd_address_line1_middle
+  sta lcd_address_counter
+  ora #lcd_ddram
+  jsr lcdcommand
+  jmp lcdreturn
+lcdchangeline2:
+  lda #lcd_address_line2_middle
+  sta lcd_address_counter
+  ora #lcd_ddram
+  jsr lcdcommand
+  jmp lcdreturn
+lcdreturn:
   pla
   rts
 
@@ -274,38 +299,6 @@ lcdbusyloop0:
   sta lcd_address_counter
   lda #%11111111 ; LCD make all write only
   sta via_dir_b
-  pla
-  rts
-
-lcdlinesfix:
-  pha
-  lda lcd_address_counter
-  cmp #lcd_address_line1_middle
-  beq lcdchangeline12
-  cmp #lcd_address_line2_middle
-  beq lcdchangeline23
-  cmp #lcd_address_line2_start
-  beq lcdchangeline2
-  jmp lcdreturn
-lcdchangeline12:
-  lda #lcd_address_line2_start
-  sta lcd_address_counter
-  ora #lcd_ddram
-  jsr lcddir
-  jmp lcdreturn
-lcdchangeline23:
-  lda #lcd_address_line1_middle
-  sta lcd_address_counter
-  ora #lcd_ddram
-  jsr lcddir
-  jmp lcdreturn
-lcdchangeline2:
-  lda #lcd_address_line2_middle
-  sta lcd_address_counter
-  ora #lcd_ddram
-  jsr lcddir
-  jmp lcdreturn
-lcdreturn:
   pla
   rts
 
@@ -388,7 +381,7 @@ isr:
   pha
   lda via_ifr
   lda #"i"
-  jsr lcdprnt
+  jsr lcdprint
   lda #$01
   sta via_data_a
   pla
