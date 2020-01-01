@@ -128,60 +128,71 @@ loop:
   cmp btn_state_cache
   bne loop
   bit btnup
-  bne noupbtn
+  beq upbuttonpress
+  bit btndown
+  beq downbuttonpress
+  bit btnleft
+  beq leftbuttonpress
+  bit btnright
+  beq rightbuttonpress
+  jsr ledlatchlow
+  jmp loop
+upbuttonpress:
   lda #"u"
   ;;sta acia_data
   jsr lcdprint
   sta via_sr
   wai
-  lda #$01
-  sta via_data_a
+  jsr ledlatchhigh
   ;;lda acia_data
   ;;jsr lcdprintbinary
   jmp loop
-noupbtn:
-  bit btndown
-  bne nodownbtn
+downbuttonpress:
   lda #"d"
   ;;sta acia_data
   jsr lcdprint
   sta via_sr
   wai
-  lda #$01
-  sta via_data_a
+  jsr ledlatchhigh
   ;;lda acia_stat
   ;;jsr lcdprintbinary
   jmp loop
-nodownbtn:
-  bit btnleft
-  bne noleftbtn
+leftbuttonpress:
   lda #"l"
   ;;sta acia_data
   jsr lcdprint
   sta via_sr
   wai
-  lda #$01
-  sta via_data_a
+  jsr ledlatchhigh
   ;;lda acia_comm
   ;;jsr lcdprintbinary
   jmp loop
-noleftbtn:
-  bit btnright
-  bne norightbtn
+rightbuttonpress:
   lda #"r"
   ;;sta acia_data
   jsr lcdprint
   sta via_sr
   wai
-  lda #$01
-  sta via_data_a
+  jsr ledlatchhigh
   ;;lda acia_ctrl
   ;;jsr lcdprintbinary
   jmp loop
-norightbtn:
-  lda #$00
+
+ledlatchhigh:
+  pha
+  lda via_data_a
+  ora #1
   sta via_data_a
-  jmp loop
+  pla
+  rts
+
+ledlatchlow:
+  pha
+  lda via_data_a
+  and #%11111110
+  sta via_data_a
+  pla
+  rts
 
 lcdprintbinary:
   pha
