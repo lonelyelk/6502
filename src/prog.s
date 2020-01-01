@@ -15,6 +15,20 @@ acia_ctrl .equ $7003
 btn_state_cache .equ $3000
 lcd_address_counter .equ $3001
 
+lcd_control_rs .equ $20
+lcd_control_e .equ $80
+lcd_control_rw .equ $40
+lcd_busy_flag .equ $80
+lcd_ddram .equ $80
+lcd_cgram .equ $40
+lcd_address_line1_middle .equ $14
+lcd_address_line2_start .equ $40
+lcd_address_line2_middle .equ $54
+lcd_char_height .equ $08
+lcd_chars_number .equ $08
+
+btn_mask .equ $1e
+
   .org $8000
 
 reset:
@@ -58,13 +72,13 @@ reset:
   jsr lcddir
   jsr lcdbusy
 
-  lda lcdcgram ; LCD: set address counter to CGRAM 00
+  lda #lcd_cgram ; LCD: set address counter to CGRAM 00
   jsr lcddir
   jsr lcdbusy
-  lda lcdcharsnumber
-  ldx #$00
+  lda #lcd_chars_number
+  ldx #0
 setupcharsloop:
-  ldy lcdcharheight
+  ldy #lcd_char_height
   pha
 setupcharloop:
   lda lcdchars, X
@@ -76,7 +90,7 @@ setupcharloop:
   dec
   bne setupcharsloop
 
-  lda lcdbusyflag ; LCD: set address counter to DDRAM 00
+  lda #lcd_ddram ; LCD: set address counter to DDRAM 00
   jsr lcddir
   jsr lcdbusy
 
@@ -84,14 +98,14 @@ setupcharloop:
   jsr lcddir
   jsr lcdbusy
 
-  lda #$00
-  ldx lcdcharsnumber
-printchars:
+  lda #0
+  ldx #lcd_chars_number
+printcharsloop:
   jsr lcdprnt
   jsr lcdlinesfix
   inc
   dex
-  bne printchars
+  bne printcharsloop
 
   lda #">"
   jsr lcdprnt
@@ -105,19 +119,19 @@ printchars:
   ;;sta acia_comm
 
   lda via_data_a
-  and btnmask
+  and #btn_mask
   sta btn_state_cache
 
 loop:
   lda via_data_a
-  and btnmask
+  and #btn_mask
   cmp btn_state_cache
   beq loop
   sta btn_state_cache
   lda #$09
   jsr waitms
   lda via_data_a
-  and btnmask
+  and #btn_mask
   cmp btn_state_cache
   bne loop
   bit btnup
@@ -218,13 +232,13 @@ waitloop1:
 lcddir:
   pha
   pha
-  lda lcdsys
+  lda #0
   sta via_data_a
-  ora lcde
+  ora #lcd_control_e
   sta via_data_a
   pla
   sta via_data_b
-  lda lcdsys
+  lda #0
   sta via_data_a
   pla
   rts
@@ -232,13 +246,13 @@ lcddir:
 lcdprnt:
   pha
   pha
-  lda lcdtxt
+  lda #lcd_control_rs
   sta via_data_a
-  ora lcde
+  ora #lcd_control_e
   sta via_data_a
   pla
   sta via_data_b
-  lda lcdtxt
+  lda #lcd_control_rs
   sta via_data_a
   jsr lcdbusy
   pla
@@ -249,12 +263,12 @@ lcdbusy:
   lda #%00000000 ; LCD allow read from all pins
   sta via_dir_b
 lcdbusyloop0:
-  lda lcdrw
+  lda #lcd_control_rw
   sta via_data_a
-  ora lcde
+  ora #lcd_control_e
   sta via_data_a
   lda via_data_b
-  and lcdbusyflag
+  and #lcd_busy_flag
   bne lcdbusyloop0
   lda via_data_b
   sta lcd_address_counter
@@ -266,53 +280,35 @@ lcdbusyloop0:
 lcdlinesfix:
   pha
   lda lcd_address_counter
-  cmp lcdline12
+  cmp #lcd_address_line1_middle
   beq lcdchangeline12
-  cmp lcdline23
+  cmp #lcd_address_line2_middle
   beq lcdchangeline23
-  cmp lcdline2
+  cmp #lcd_address_line2_start
   beq lcdchangeline2
   jmp lcdreturn
 lcdchangeline12:
-  lda lcdline2
+  lda #lcd_address_line2_start
   sta lcd_address_counter
-  ora lcdbusyflag
+  ora #lcd_ddram
   jsr lcddir
   jmp lcdreturn
 lcdchangeline23:
-  lda lcdline12
+  lda #lcd_address_line1_middle
   sta lcd_address_counter
-  ora lcdbusyflag
+  ora #lcd_ddram
   jsr lcddir
   jmp lcdreturn
 lcdchangeline2:
-  lda lcdline23
+  lda #lcd_address_line2_middle
   sta lcd_address_counter
-  ora lcdbusyflag
+  ora #lcd_ddram
   jsr lcddir
   jmp lcdreturn
 lcdreturn:
   pla
   rts
 
-lcdsys:
-  .byte $00
-lcdtxt:
-  .byte $20
-lcde:
-  .byte $80
-lcdrw:
-  .byte $40
-lcdbusyflag:
-  .byte $80
-lcdcgram:
-  .byte $40
-lcdline12:
-  .byte $14
-lcdline2:
-  .byte $40
-lcdline23:
-  .byte $54
 lcdchars:
   .byte %10100 ;; elk
   .byte %10100
@@ -378,10 +374,6 @@ lcdchars:
   .byte %11111
   .byte %01001
   .byte %11011
-lcdcharheight:
-  .byte $08
-lcdcharsnumber:
-  .byte $08
 
 btnup:
   .byte $02
@@ -391,8 +383,6 @@ btnleft:
   .byte $08
 btnright:
   .byte $10
-btnmask:
-  .byte $1e
 
 isr:
   pha
