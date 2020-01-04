@@ -17,7 +17,8 @@ acia_comm .equ $7002
 acia_ctrl .equ $7003
 
 btn_state_cache .equ $3000
-lcd_address_counter .equ $3001
+btn_state .equ $3001
+lcd_address_counter .equ $3010
 
 lcd_control_rs .equ $02
 lcd_control_rw .equ $04
@@ -33,11 +34,29 @@ lcd_chars_number .equ $08
 
 btn_mask .equ $1e
 
+btn_0 .equ %00101000
+btn_1 .equ %00010001
+btn_2 .equ %00100001
+btn_3 .equ %01000001
+btn_4 .equ %00010010
+btn_5 .equ %00100010
+btn_6 .equ %01000010
+btn_7 .equ %00010100
+btn_8 .equ %00100100
+btn_9 .equ %01000100
+btn_a .equ %10000001
+btn_b .equ %10000010
+btn_c .equ %10000100
+btn_d .equ %10001000
+btn_star .equ %00011000
+btn_hash .equ %01001000
+
   .org $8000
 
 reset:
-  lda #%00000001 ; LED and buttons
+  lda #%00001111 ; BTN: horizontals are high, reading verticals
   sta via_dir_a
+  sta via_data_a
 
   jsr serialsetup
   jsr lcdsetup
@@ -65,61 +84,128 @@ printcharsloop:
   sta btn_state_cache
 
 loop:
+  lda via_dir_a
+  and #%11110000
+  beq loopcont
+  lda #%00001111
+  sta via_dir_a
+  sta via_data_a
+loopcont:
   lda via_data_a
-  and #btn_mask
+  and #%11110000
+  beq loop
+  sta btn_state
+  lda #%11110000 
+  sta via_dir_a
+  sta via_data_a
+  lda via_data_a
+  and #%00001111
+  beq loop
+  ora btn_state
   cmp btn_state_cache
   beq loop
   sta btn_state_cache
   lda #$09
   jsr waitms
   lda via_data_a
-  and #btn_mask
+  and #%00001111
+  beq loop
+  sta btn_state
+  lda #%00001111 
+  sta via_dir_a
+  sta via_data_a
+  lda via_data_a
+  and #%11110000
+  beq loop
+  ora btn_state
   cmp btn_state_cache
   bne loop
-  bit btnup
-  beq upbuttonpress
-  bit btndown
-  beq downbuttonpress
-  bit btnleft
-  beq leftbuttonpress
-  bit btnright
-  beq rightbuttonpress
-  jsr ledlow
+  cmp #btn_0
+  beq pressbtn0
+  cmp #btn_1
+  beq pressbtn1
+  cmp #btn_2
+  beq pressbtn2
+  cmp #btn_3
+  beq pressbtn3
+  cmp #btn_4
+  beq pressbtn4
+  cmp #btn_5
+  beq pressbtn5
+  cmp #btn_6
+  beq pressbtn6
+  cmp #btn_7
+  beq pressbtn7
+  cmp #btn_8
+  beq pressbtn8
+  cmp #btn_9
+  beq pressbtn9
+  cmp #btn_a
+  beq pressbtna
+  cmp #btn_b
+  beq pressbtnb
+  cmp #btn_c
+  beq pressbtnc
+  cmp #btn_d
+  beq pressbtnd
+  cmp #btn_star
+  beq pressbtnstar
+  cmp #btn_hash
+  beq pressbtnhash
   jmp loop
-upbuttonpress:
-  lda #"u"
-  ;;sta acia_data
-  jsr lcdprint
-  jsr serialoutput
-  jsr ledhigh
-  ;;lda acia_data
-  ;;jsr lcdprintbinary
-  jmp loop
-downbuttonpress:
+pressbtn0:
+  lda #"0"
+  jmp loopcont1
+pressbtn1:
+  lda #"1"
+  jmp loopcont1
+pressbtn2:
+  lda #"2"
+  jmp loopcont1
+pressbtn3:
+  lda #"3"
+  jmp loopcont1
+pressbtn4:
+  lda #"4"
+  jmp loopcont1
+pressbtn5:
+  lda #"5"
+  jmp loopcont1
+pressbtn6:
+  lda #"6"
+  jmp loopcont1
+pressbtn7:
+  lda #"7"
+  jmp loopcont1
+pressbtn8:
+  lda #"8"
+  jmp loopcont1
+pressbtn9:
+  lda #"9"
+  jmp loopcont1
+pressbtna:
+  lda #"a"
+  jmp loopcont1
+pressbtnb:
+  lda #"b"
+  jmp loopcont1
+pressbtnc:
+  lda #"c"
+  jmp loopcont1
+pressbtnd:
   lda #"d"
+  jmp loopcont1
+pressbtnstar:
+  lda #"*"
+  jmp loopcont1
+pressbtnhash:
+  lda #"#"
+loopcont1:
   ;;sta acia_data
   jsr lcdprint
   jsr serialoutput
-  jsr ledhigh
-  ;;lda acia_stat
-  ;;jsr lcdprintbinary
-  jmp loop
-leftbuttonpress:
-  lda #"l"
-  ;;sta acia_data
-  jsr lcdprint
-  jsr serialoutput
-  jsr ledhigh
-  ;;lda acia_comm
-  ;;jsr lcdprintbinary
-  jmp loop
-rightbuttonpress:
-  lda #"r"
-  ;;sta acia_data
-  jsr lcdprint
-  jsr serialoutput
-  jsr ledhigh
-  ;;lda acia_ctrl
+  ;;jsr ledhigh
+  ;;lda acia_data
   ;;jsr lcdprintbinary
   jmp loop
 
