@@ -7,6 +7,10 @@ via_acr .equ $600b
 via_pcr .equ $600c
 via_ifr .equ $600d
 via_ier .equ $600e
+
+via_lcd_write .equ %11111110 ; LCD data (4 most significant bits) E, RW, RS
+via_lcd_read .equ %00001110
+
 acia_data .equ $7000
 acia_stat .equ $7001
 acia_comm .equ $7002
@@ -170,7 +174,7 @@ shiftloop0:
 
 lcdsetup:
   pha
-  lda #%11111110 ; LCD data (4 most significant bits) E, RW, RS
+  lda #via_lcd_write ; LCD data (4 most significant bits) E, RW, RS
   sta via_dir_b
 
   lda #$0f ;; wait ~15 ms after powerup
@@ -345,7 +349,7 @@ lcdreturn:
 
 lcdbusy8:
   pha
-  lda #%00001110 ; LCD allow read from all pins
+  lda #via_lcd_read ; LCD allow read from data pins
   sta via_dir_b
 lcdbusyloop80:
   lda #lcd_control_rw
@@ -357,14 +361,14 @@ lcdbusyloop80:
   bne lcdbusyloop80
   lda #lcd_control_rw
   sta via_data_b
-  lda #%11111110 ; LCD make all write only
+  lda #via_lcd_write ; LCD make all write only
   sta via_dir_b
   pla
   rts
 
 lcdbusy:
   pha
-  lda #%00001110 ; LCD allow read from all pins
+  lda #via_lcd_read ; LCD allow read from data pins
   sta via_dir_b
 lcdbusyloop0:
   lda #lcd_control_rw
@@ -390,7 +394,7 @@ lcdbusyloop0:
   bne lcdbusyloop0
   lda #lcd_control_rw
   sta via_data_b
-  lda #%11111110 ; LCD make all write only
+  lda #via_lcd_write ; LCD make all write only
   sta via_dir_b
   pla
   rts
