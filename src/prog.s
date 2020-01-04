@@ -46,13 +46,13 @@ reset:
   lda #0
   ldx #lcd_chars_number
 printcharsloop:
-  jsr lcdprint
+  jsr lcdprint4
   inc
   dex
   bne printcharsloop
 
   lda #">"
-  jsr lcdprint
+  jsr lcdprint4
 
   ;;lda #$00
   ;;sta acia_stat
@@ -90,7 +90,7 @@ loop:
 upbuttonpress:
   lda #"u"
   ;;sta acia_data
-  jsr lcdprint
+  jsr lcdprint4
   sta via_sr
   wai
   jsr ledlatchhigh
@@ -100,7 +100,7 @@ upbuttonpress:
 downbuttonpress:
   lda #"d"
   ;;sta acia_data
-  jsr lcdprint
+  jsr lcdprint4
   sta via_sr
   wai
   jsr ledlatchhigh
@@ -110,7 +110,7 @@ downbuttonpress:
 leftbuttonpress:
   lda #"l"
   ;;sta acia_data
-  jsr lcdprint
+  jsr lcdprint4
   sta via_sr
   wai
   jsr ledlatchhigh
@@ -120,7 +120,7 @@ leftbuttonpress:
 rightbuttonpress:
   lda #"r"
   ;;sta acia_data
-  jsr lcdprint
+  jsr lcdprint4
   sta via_sr
   wai
   jsr ledlatchhigh
@@ -170,7 +170,7 @@ lcdsetup:
   pha
   lda #%11100001 ; LCD control (E, RW, RS) and LED
   sta via_dir_a
-  lda #%11111111 ; LCD data
+  lda #%11110000 ; LCD data
   sta via_dir_b
 
   lda #$0f ;; wait ~15 ms after powerup
@@ -183,23 +183,27 @@ lcdsetup:
   jsr lcdcommand
   lda #$01
   jsr waitms
-  lda #%00111000
+  lda #%00111000 ; LCD: repeat 3 times
   jsr lcdcommand
   lda #$01
   jsr waitms
+  lda #%00101000 ; LCD: 4 bit; 2 lines; 5x8 dots
+  jsr lcdcommandbusy ; use 8 bit subroutine since it's in 8 bit mode still
+  lda #%00101000 ; LCD: 4 bit; 2 lines; 5x8 dots
+  jsr lcdcommandbusy4
 
   lda #%00000001 ; LCD: clear display
-  jsr lcdcommand
+  jsr lcdcommand4
   lda #$01
   jsr waitms
-  jsr lcdbusy
+  jsr lcdbusy4
   lda #%00001111 ; LCD: display on; cursor on; blink on
-  jsr lcdcommandbusy
+  jsr lcdcommandbusy4
   lda #%00000110 ; LCD: increment address; no shift display
-  jsr lcdcommandbusy
+  jsr lcdcommandbusy4
 
   lda #lcd_cgram ; LCD: set address counter to CGRAM 00
-  jsr lcdcommandbusy
+  jsr lcdcommandbusy4
   lda #lcd_chars_number
   ldx #0
 setupcharsloop:
@@ -207,7 +211,7 @@ setupcharsloop:
   pha
 setupcharloop:
   lda lcdchars, X
-  jsr lcdwrite
+  jsr lcdwrite4
   inx
   dey
   bne setupcharloop
@@ -216,10 +220,10 @@ setupcharloop:
   bne setupcharsloop
 
   lda #lcd_ddram ; LCD: set address counter to DDRAM 00
-  jsr lcdcommandbusy
+  jsr lcdcommandbusy4
 
   lda #%00000010 ; LCD: home
-  jsr lcdcommandbusy
+  jsr lcdcommandbusy4
 
   pla
   rts
@@ -247,9 +251,39 @@ lcdcommand:
   pla
   rts
 
+lcdcommand4:
+  pha
+  pha
+  sta via_data_b
+  lda #0
+  sta via_data_a
+  ora #lcd_control_e
+  sta via_data_a
+  lda #0
+  sta via_data_a
+  pla
+  asl
+  asl
+  asl
+  asl
+  sta via_data_b
+  lda #0
+  sta via_data_a
+  ora #lcd_control_e
+  sta via_data_a
+  lda #0
+  sta via_data_a
+  pla
+  rts
+
 lcdcommandbusy:
   jsr lcdcommand
   jsr lcdbusy
+  rts
+
+lcdcommandbusy4:
+  jsr lcdcommand4
+  jsr lcdbusy4
   rts
 
 lcdwrite:
@@ -262,6 +296,32 @@ lcdwrite:
   lda #lcd_control_rs
   sta via_data_a
   jsr lcdbusy
+  pla
+  rts
+
+lcdwrite4:
+  pha
+  pha
+  sta via_data_b
+  lda #lcd_control_rs
+  sta via_data_a
+  ora #lcd_control_e
+  sta via_data_a
+  lda #lcd_control_rs
+  sta via_data_a
+  pla
+  asl
+  asl
+  asl
+  asl
+  sta via_data_b
+  lda #lcd_control_rs
+  sta via_data_a
+  ora #lcd_control_e
+  sta via_data_a
+  lda #lcd_control_rs
+  sta via_data_a
+  jsr lcdbusy4
   pla
   rts
 
@@ -297,6 +357,38 @@ lcdreturn:
   pla
   rts
 
+lcdprint4:
+  jsr lcdwrite4
+  pha
+  lda lcd_address_counter
+  cmp #lcd_address_line1_middle
+  beq lcdchangeline412
+  cmp #lcd_address_line2_middle
+  beq lcdchangeline423
+  cmp #lcd_address_line2_start
+  beq lcdchangeline42
+  jmp lcdreturn4
+lcdchangeline412:
+  lda #lcd_address_line2_start
+  sta lcd_address_counter
+  ora #lcd_ddram
+  jsr lcdcommandbusy4
+  jmp lcdreturn4
+lcdchangeline423:
+  lda #lcd_address_line1_middle
+  sta lcd_address_counter
+  ora #lcd_ddram
+  jsr lcdcommandbusy4
+  jmp lcdreturn4
+lcdchangeline42:
+  lda #lcd_address_line2_middle
+  sta lcd_address_counter
+  ora #lcd_ddram
+  jsr lcdcommandbusy4
+lcdreturn4:
+  pla
+  rts
+
 lcdbusy:
   pha
   lda #%00000000 ; LCD allow read from all pins
@@ -314,6 +406,40 @@ lcdbusyloop0:
   lda #lcd_control_rw
   sta via_data_a
   lda #%11111111 ; LCD make all write only
+  sta via_dir_b
+  pla
+  rts
+
+lcdbusy4:
+  pha
+  lda #%00000000 ; LCD allow read from all pins
+  sta via_dir_b
+lcdbusyloop40:
+  lda #lcd_control_rw
+  sta via_data_a
+  ora #lcd_control_e
+  sta via_data_a
+  lda via_data_b
+  and #%11110000
+  sta lcd_address_counter
+  lda #lcd_control_rw
+  sta via_data_a
+  ora #lcd_control_e
+  sta via_data_a
+  lda via_data_b
+  and #%11110000
+  ror
+  ror
+  ror
+  ror
+  ora lcd_address_counter
+  sta lcd_address_counter
+  and #lcd_busy_flag
+  bne lcdbusyloop40
+  lda via_data_b
+  lda #lcd_control_rw
+  sta via_data_a
+  lda #%11110000 ; LCD make all write only
   sta via_dir_b
   pla
   rts
