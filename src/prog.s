@@ -280,20 +280,19 @@ lcdchangeline12:
   lda #lcd_address_line2_start
   sta lcd_address_counter
   ora #lcd_ddram
-  jsr lcdcommand
+  jsr lcdcommandbusy
   jmp lcdreturn
 lcdchangeline23:
   lda #lcd_address_line1_middle
   sta lcd_address_counter
   ora #lcd_ddram
-  jsr lcdcommand
+  jsr lcdcommandbusy
   jmp lcdreturn
 lcdchangeline2:
   lda #lcd_address_line2_middle
   sta lcd_address_counter
   ora #lcd_ddram
-  jsr lcdcommand
-  jmp lcdreturn
+  jsr lcdcommandbusy
 lcdreturn:
   pla
   rts
