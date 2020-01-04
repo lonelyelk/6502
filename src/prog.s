@@ -32,10 +32,6 @@ btn_mask .equ $1e
   .org $8000
 
 reset:
-  lda #%11100001 ; LCD control (E, RW, RS) and LED
-  sta via_dir_a
-  lda #%11111111 ; LCD data
-  sta via_dir_b
   lda via_sr ; VIA reset shift register
   lda via_ier
   ora #%00000100 ; VIA enable shift register interrupt
@@ -45,53 +41,7 @@ reset:
   and #%11111011 ; VIA shift register mode 110
   sta via_acr
 
-  lda #$0f
-  jsr waitms
-  lda #%00111000 ; LCD: 8 bit; 2 lines; 5x8 dots
-  jsr lcdcommand
-  lda #$05
-  jsr waitms
-  lda #%00111000 ; LCD: repeat 3 times
-  jsr lcdcommand
-  lda #$01
-  jsr waitms
-  lda #%00111000
-  jsr lcdcommand
-  lda #$01
-  jsr waitms
-
-  lda #%00000001 ; LCD: clear display
-  jsr lcdcommand
-  lda #$01
-  jsr waitms
-  jsr lcdbusy
-  lda #%00001111 ; LCD: display on; cursor on; blink on
-  jsr lcdcommandbusy
-  lda #%00000110 ; LCD: increment address; no shift display
-  jsr lcdcommandbusy
-
-  lda #lcd_cgram ; LCD: set address counter to CGRAM 00
-  jsr lcdcommandbusy
-  lda #lcd_chars_number
-  ldx #0
-setupcharsloop:
-  ldy #lcd_char_height
-  pha
-setupcharloop:
-  lda lcdchars, X
-  jsr lcdwrite
-  inx
-  dey
-  bne setupcharloop
-  pla
-  dec
-  bne setupcharsloop
-
-  lda #lcd_ddram ; LCD: set address counter to DDRAM 00
-  jsr lcdcommandbusy
-
-  lda #%00000010 ; LCD: home
-  jsr lcdcommandbusy
+  jsr lcdsetup
 
   lda #0
   ldx #lcd_chars_number
@@ -213,6 +163,64 @@ printzero:
 shiftloop0:
   dex
   bne shiftloop
+  pla
+  rts
+
+lcdsetup:
+  pha
+  lda #%11100001 ; LCD control (E, RW, RS) and LED
+  sta via_dir_a
+  lda #%11111111 ; LCD data
+  sta via_dir_b
+
+  lda #$0f ;; wait ~15 ms after powerup
+  jsr waitms
+  lda #%00111000 ; LCD: 8 bit; 2 lines; 5x8 dots
+  jsr lcdcommand
+  lda #$05
+  jsr waitms
+  lda #%00111000 ; LCD: repeat 3 times
+  jsr lcdcommand
+  lda #$01
+  jsr waitms
+  lda #%00111000
+  jsr lcdcommand
+  lda #$01
+  jsr waitms
+
+  lda #%00000001 ; LCD: clear display
+  jsr lcdcommand
+  lda #$01
+  jsr waitms
+  jsr lcdbusy
+  lda #%00001111 ; LCD: display on; cursor on; blink on
+  jsr lcdcommandbusy
+  lda #%00000110 ; LCD: increment address; no shift display
+  jsr lcdcommandbusy
+
+  lda #lcd_cgram ; LCD: set address counter to CGRAM 00
+  jsr lcdcommandbusy
+  lda #lcd_chars_number
+  ldx #0
+setupcharsloop:
+  ldy #lcd_char_height
+  pha
+setupcharloop:
+  lda lcdchars, X
+  jsr lcdwrite
+  inx
+  dey
+  bne setupcharloop
+  pla
+  dec
+  bne setupcharsloop
+
+  lda #lcd_ddram ; LCD: set address counter to DDRAM 00
+  jsr lcdcommandbusy
+
+  lda #%00000010 ; LCD: home
+  jsr lcdcommandbusy
+
   pla
   rts
 
