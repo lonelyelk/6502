@@ -151,6 +151,10 @@ serialsetup:
   sta via_acr
   lda #%1100 ; VIA control CA2 low
   sta via_pcr
+  lda #%1110 ; VIA control CA2 high
+  sta via_pcr
+  lda #%1100 ; VIA control CA2 low
+  sta via_pcr
   pla
   rts
 
