@@ -38,15 +38,8 @@ btn_mask .equ $1e
 reset:
   lda #%00000001 ; LED and buttons
   sta via_dir_a
-  lda via_sr ; VIA reset shift register
-  lda via_ier
-  ora #%00000100 ; VIA enable shift register interrupt
-  sta via_ier
-  lda via_acr
-  ora #%00011000
-  and #%11111011 ; VIA shift register mode 110
-  sta via_acr
 
+  jsr serialsetup
   jsr lcdsetup
 
   lda #0
@@ -91,15 +84,14 @@ loop:
   beq leftbuttonpress
   bit btnright
   beq rightbuttonpress
-  jsr ledlatchlow
+  jsr ledlow
   jmp loop
 upbuttonpress:
   lda #"u"
   ;;sta acia_data
   jsr lcdprint
-  sta via_sr
-  wai
-  jsr ledlatchhigh
+  jsr serialoutput
+  jsr ledhigh
   ;;lda acia_data
   ;;jsr lcdprintbinary
   jmp loop
@@ -107,9 +99,8 @@ downbuttonpress:
   lda #"d"
   ;;sta acia_data
   jsr lcdprint
-  sta via_sr
-  wai
-  jsr ledlatchhigh
+  jsr serialoutput
+  jsr ledhigh
   ;;lda acia_stat
   ;;jsr lcdprintbinary
   jmp loop
@@ -117,9 +108,8 @@ leftbuttonpress:
   lda #"l"
   ;;sta acia_data
   jsr lcdprint
-  sta via_sr
-  wai
-  jsr ledlatchhigh
+  jsr serialoutput
+  jsr ledhigh
   ;;lda acia_comm
   ;;jsr lcdprintbinary
   jmp loop
@@ -127,14 +117,13 @@ rightbuttonpress:
   lda #"r"
   ;;sta acia_data
   jsr lcdprint
-  sta via_sr
-  wai
-  jsr ledlatchhigh
+  jsr serialoutput
+  jsr ledhigh
   ;;lda acia_ctrl
   ;;jsr lcdprintbinary
   jmp loop
 
-ledlatchhigh:
+ledhigh:
   pha
   lda via_data_a
   ora #1
@@ -142,11 +131,37 @@ ledlatchhigh:
   pla
   rts
 
-ledlatchlow:
+ledlow:
   pha
   lda via_data_a
   and #%11111110
   sta via_data_a
+  pla
+  rts
+
+serialsetup:
+  pha
+  lda via_sr ; VIA reset shift register
+  lda via_ier
+  ora #%00000100 ; VIA enable shift register interrupt
+  sta via_ier
+  lda via_acr
+  ora #%00011000
+  and #%11111011 ; VIA shift register mode 110
+  sta via_acr
+  lda #%1100 ; VIA control CA2 low
+  sta via_pcr
+  pla
+  rts
+
+serialoutput:
+  sta via_sr
+  wai
+  pha
+  lda #%1110
+  sta via_pcr
+  lda #%1100
+  sta via_pcr
   pla
   rts
 
@@ -479,7 +494,7 @@ isr:
   lda via_ifr
   lda #"i"
   jsr lcdprint
-  jsr ledlatchhigh
+  jsr ledhigh
   pla
   rti
 
