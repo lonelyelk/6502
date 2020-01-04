@@ -237,13 +237,11 @@ waitloop1:
 
 lcdcommand:
   pha
-  pha
+  sta via_data_b
   lda #0
   sta via_data_a
   ora #lcd_control_e
   sta via_data_a
-  pla
-  sta via_data_b
   lda #0
   sta via_data_a
   pla
@@ -256,13 +254,11 @@ lcdcommandbusy:
 
 lcdwrite:
   pha
-  pha
+  sta via_data_b
   lda #lcd_control_rs
   sta via_data_a
   ora #lcd_control_e
   sta via_data_a
-  pla
-  sta via_data_b
   lda #lcd_control_rs
   sta via_data_a
   jsr lcdbusy
@@ -316,6 +312,8 @@ lcdbusyloop0:
   bne lcdbusyloop0
   lda via_data_b
   sta lcd_address_counter
+  lda #lcd_control_rw
+  sta via_data_a
   lda #%11111111 ; LCD make all write only
   sta via_dir_b
   pla
