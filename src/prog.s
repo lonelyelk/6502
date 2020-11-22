@@ -11,11 +11,6 @@ via_ier .equ $600e
 via_lcd_write .equ %11111110 ; LCD data (4 most significant bits) E, RW, RS
 via_lcd_read .equ %00001110
 
-acia_data .equ $7000
-acia_stat .equ $7001
-acia_comm .equ $7002
-acia_ctrl .equ $7003
-
 btn_state_cache .equ $3000
 btn_state .equ $3001
 lcd_address_counter .equ $3010
@@ -71,13 +66,6 @@ printcharsloop:
 
   lda #">"
   jsr lcdprint
-
-  ;;lda #$00
-  ;;sta acia_stat
-  ;;lda #%00000000 ; ACIA: 1 stop bit; 8 bit words; 16x /(- 9600 baud rate)
-  ;;sta acia_ctrl
-  ;;lda #%11001111 ; ACIA: no parity; no echo; no irq
-  ;;sta acia_comm
 
   lda via_data_a
   and #btn_mask
@@ -201,11 +189,9 @@ pressbtnstar:
 pressbtnhash:
   lda #"#"
 loopcont1:
-  ;;sta acia_data
   jsr lcdprint
   jsr serialoutput
   ;;jsr ledhigh
-  ;;lda acia_data
   ;;jsr lcdprintbinary
   jmp loop
 
