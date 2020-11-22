@@ -134,9 +134,9 @@ ledlow:
 serialsetup:
   pha
   lda via_sr ; VIA reset shift register
-  lda via_ier
-  ora #%00000100 ; VIA enable shift register interrupt
-  sta via_ier
+  ;; lda via_ier
+  ;; ora #%00000100 ; VIA enable shift register interrupt
+  ;; sta via_ier
   lda via_acr
   ora #%00011000
   and #%11111011 ; VIA shift register mode 110
