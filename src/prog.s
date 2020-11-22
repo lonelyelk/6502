@@ -28,23 +28,7 @@ lcd_char_height .equ $08
 lcd_chars_number .equ $08
 
 btn_mask .equ $1e
-
-btn_0 .equ %00101000
-btn_1 .equ %00010001
-btn_2 .equ %00100001
-btn_3 .equ %01000001
-btn_4 .equ %00010010
-btn_5 .equ %00100010
-btn_6 .equ %01000010
-btn_7 .equ %00010100
-btn_8 .equ %00100100
-btn_9 .equ %01000100
-btn_a .equ %10000001
-btn_b .equ %10000010
-btn_c .equ %10000100
-btn_d .equ %10001000
-btn_star .equ %00011000
-btn_hash .equ %01001000
+btn_num .equ $10
 
   .org $8000
 
@@ -108,87 +92,16 @@ loopcont:
   ora btn_state
   cmp btn_state_cache
   bne loop
-  cmp #btn_0
-  beq pressbtn0
-  cmp #btn_1
-  beq pressbtn1
-  cmp #btn_2
-  beq pressbtn2
-  cmp #btn_3
-  beq pressbtn3
-  cmp #btn_4
-  beq pressbtn4
-  cmp #btn_5
-  beq pressbtn5
-  cmp #btn_6
-  beq pressbtn6
-  cmp #btn_7
-  beq pressbtn7
-  cmp #btn_8
-  beq pressbtn8
-  cmp #btn_9
-  beq pressbtn9
-  cmp #btn_a
-  beq pressbtna
-  cmp #btn_b
-  beq pressbtnb
-  cmp #btn_c
-  beq pressbtnc
-  cmp #btn_d
-  beq pressbtnd
-  cmp #btn_star
-  beq pressbtnstar
-  cmp #btn_hash
-  beq pressbtnhash
-  jmp loop
-pressbtn0:
-  lda #"0"
-  jmp loopcont1
-pressbtn1:
-  lda #"1"
-  jmp loopcont1
-pressbtn2:
-  lda #"2"
-  jmp loopcont1
-pressbtn3:
-  lda #"3"
-  jmp loopcont1
-pressbtn4:
-  lda #"4"
-  jmp loopcont1
-pressbtn5:
-  lda #"5"
-  jmp loopcont1
-pressbtn6:
-  lda #"6"
-  jmp loopcont1
-pressbtn7:
-  lda #"7"
-  jmp loopcont1
-pressbtn8:
-  lda #"8"
-  jmp loopcont1
-pressbtn9:
-  lda #"9"
-  jmp loopcont1
-pressbtna:
-  lda #"a"
-  jmp loopcont1
-pressbtnb:
-  lda #"b"
-  jmp loopcont1
-pressbtnc:
-  lda #"c"
-  jmp loopcont1
-pressbtnd:
-  lda #"d"
-  jmp loopcont1
-pressbtnstar:
-  lda #"*"
-  jmp loopcont1
-pressbtnhash:
-  lda #"#"
-loopcont1:
+  ldx 0
+btn_loop:
+  cmp btninput, X
+  beq print_btn_char
+  inx
+  cpx #btn_num
+  beq loop
+  jmp btn_loop
+print_btn_char:
+  lda btnoutput, X
   jsr lcdprint
   jsr serialoutput
   ;;jsr ledhigh
@@ -556,14 +469,41 @@ lcdchars:
   .byte %01001
   .byte %11011
 
-btnup:
-  .byte $02
-btndown:
-  .byte $04
-btnleft:
-  .byte $08
-btnright:
-  .byte $10
+btninput:
+  .byte %00101000 ;; 0
+  .byte %00010001 ;; 1
+  .byte %00100001 ;; 2
+  .byte %01000001 ;; 3
+  .byte %00010010 ;; 4
+  .byte %00100010 ;; 5
+  .byte %01000010 ;; 6
+  .byte %00010100 ;; 7
+  .byte %00100100 ;; 8
+  .byte %01000100 ;; 9
+  .byte %10000001 ;; a
+  .byte %10000010 ;; b
+  .byte %10000100 ;; c
+  .byte %10001000 ;; d
+  .byte %00011000 ;; *
+  .byte %01001000 ;; #
+
+btnoutput:
+  .byte "0"
+  .byte "1"
+  .byte "2"
+  .byte "3"
+  .byte "4"
+  .byte "5"
+  .byte "6"
+  .byte "7"
+  .byte "8"
+  .byte "9"
+  .byte "a"
+  .byte "b"
+  .byte "c"
+  .byte "d"
+  .byte "*"
+  .byte "#"
 
 isr:
   pha
