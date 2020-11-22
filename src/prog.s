@@ -33,9 +33,9 @@ btn_num .equ $10
   .org $8000
 
 reset:
-  lda #%00001111 ; BTN: horizontals are high, reading verticals
-  sta via_dir_a
-  sta via_data_a
+  lda via_ier
+  ora #%10000010 ; VIA enable CA1 interrupt
+  sta via_ier
 
   jsr serialsetup
   jsr lcdsetup
@@ -55,12 +55,30 @@ printcharsloop:
   and #btn_mask
   sta btn_state_cache
 
+  cli
+
 loop:
   nop
   jmp loop
 
 nmi:
+irq:
   pha
+  lda via_ifr
+  and #%00000100
+  beq btn_check
+  lda #%1110 ; VIA control CA2 high
+  sta via_pcr
+  lda #%1100 ; VIA control CA2 low
+  sta via_pcr
+  lda via_sr ; VIA reset shift register
+btn_check:
+  lda via_ifr
+  and #%00000010
+  beq exit_irq
+  lda #%00001111 ; BTN: horizontals are high, reading verticals
+  sta via_dir_a
+  sta via_data_a
   lda via_dir_a
   and #%11110000
   beq loopcont
@@ -70,48 +88,48 @@ nmi:
 loopcont:
   lda via_data_a
   and #%11110000
-  beq exit_nmi
+  beq exit_irq
   sta btn_state
   lda #%11110000 
   sta via_dir_a
   sta via_data_a
   lda via_data_a
   and #%00001111
-  beq exit_nmi
+  beq exit_irq
   ora btn_state
   cmp btn_state_cache
-  beq exit_nmi
+  beq exit_irq
   sta btn_state_cache
   lda #$09
   jsr waitms
   lda via_data_a
   and #%00001111
-  beq exit_nmi
+  beq exit_irq
   sta btn_state
   lda #%00001111 
   sta via_dir_a
   sta via_data_a
   lda via_data_a
   and #%11110000
-  beq exit_nmi
+  beq exit_irq
   ora btn_state
   cmp btn_state_cache
-  bne exit_nmi
+  bne exit_irq
   ldx 0
 btn_loop:
   cmp btninput, X
   beq print_btn_char
   inx
   cpx #btn_num
-  beq exit_nmi
+  beq exit_irq
   jmp btn_loop
 print_btn_char:
   lda btnoutput, X
   jsr lcdprint
-  jsr serialoutput
+  ;;jsr serialoutput
   ;;jsr ledhigh
   ;;jsr lcdprintbinary
-exit_nmi:
+exit_irq:
   pla
   rti
 
@@ -134,9 +152,9 @@ ledlow:
 serialsetup:
   pha
   lda via_sr ; VIA reset shift register
-  ;; lda via_ier
-  ;; ora #%00000100 ; VIA enable shift register interrupt
-  ;; sta via_ier
+  lda via_ier
+  ora #%10000100 ; VIA enable shift register interrupt
+  sta via_ier
   lda via_acr
   ora #%00011000
   and #%11111011 ; VIA shift register mode 110
@@ -152,13 +170,6 @@ serialsetup:
 
 serialoutput:
   sta via_sr
-  wai
-  pha
-  lda #%1110
-  sta via_pcr
-  lda #%1100
-  sta via_pcr
-  pla
   rts
 
 lcdprintbinary:
@@ -512,14 +523,7 @@ btnoutput:
   .byte "*"
   .byte "#"
 
-isr:
-  pha
-  lda #"i"
-  jsr lcdprint
-  pla
-  rti
-
   .org $fffa
   .word nmi
   .word reset
-  .word isr
+  .word irq
