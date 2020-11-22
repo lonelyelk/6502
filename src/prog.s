@@ -56,6 +56,11 @@ printcharsloop:
   sta btn_state_cache
 
 loop:
+  nop
+  jmp loop
+
+nmi:
+  pha
   lda via_dir_a
   and #%11110000
   beq loopcont
@@ -65,40 +70,40 @@ loop:
 loopcont:
   lda via_data_a
   and #%11110000
-  beq loop
+  beq exit_nmi
   sta btn_state
   lda #%11110000 
   sta via_dir_a
   sta via_data_a
   lda via_data_a
   and #%00001111
-  beq loop
+  beq exit_nmi
   ora btn_state
   cmp btn_state_cache
-  beq loop
+  beq exit_nmi
   sta btn_state_cache
   lda #$09
   jsr waitms
   lda via_data_a
   and #%00001111
-  beq loop
+  beq exit_nmi
   sta btn_state
   lda #%00001111 
   sta via_dir_a
   sta via_data_a
   lda via_data_a
   and #%11110000
-  beq loop
+  beq exit_nmi
   ora btn_state
   cmp btn_state_cache
-  bne loop
+  bne exit_nmi
   ldx 0
 btn_loop:
   cmp btninput, X
   beq print_btn_char
   inx
   cpx #btn_num
-  beq loop
+  beq exit_nmi
   jmp btn_loop
 print_btn_char:
   lda btnoutput, X
@@ -106,7 +111,9 @@ print_btn_char:
   jsr serialoutput
   ;;jsr ledhigh
   ;;jsr lcdprintbinary
-  jmp loop
+exit_nmi:
+  pla
+  rti
 
 ledhigh:
   pha
@@ -507,13 +514,12 @@ btnoutput:
 
 isr:
   pha
-  lda via_ifr
   lda #"i"
   jsr lcdprint
-  jsr ledhigh
   pla
   rti
 
-  .org $fffc
+  .org $fffa
+  .word nmi
   .word reset
   .word isr
