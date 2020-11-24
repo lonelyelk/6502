@@ -11,9 +11,10 @@ via_ier .equ $600e
 via_lcd_write .equ %11111110 ; LCD data (4 most significant bits) E, RW, RS
 via_lcd_read .equ %00001110
 
-btn_state_cache .equ $3000
-btn_state .equ $3001
-lcd_address_counter .equ $3010
+btn_state_cache .equ $0200
+btn_state .equ $0201
+irq_counter .equ $0210
+lcd_address_counter .equ $0300
 
 lcd_control_rs .equ $02
 lcd_control_rw .equ $04
@@ -27,8 +28,8 @@ lcd_address_line2_middle .equ $54
 lcd_char_height .equ $08
 lcd_chars_number .equ $08
 
-btn_mask .equ $1e
 btn_num .equ $10
+btn_irq_ticks .equ 3
 
   .org $8000
 
@@ -41,6 +42,9 @@ reset:
   jsr lcdsetup
 
   lda #0
+  sta irq_counter
+  sta btn_state
+  sta btn_state_cache
   ldx #lcd_chars_number
 printcharsloop:
   jsr lcdprint
@@ -50,10 +54,6 @@ printcharsloop:
 
   lda #">"
   jsr lcdprint
-
-  lda via_data_a
-  and #btn_mask
-  sta btn_state_cache
 
   cli
 
@@ -65,7 +65,7 @@ nmi:
 irq:
   pha
   lda via_ifr
-  and #%00000100
+  and #%00000100 ; IRQ: check if serial port is the source of IRQ (finished data tramsmit, time to pulse latch)
   beq btn_check
   lda #%1110 ; VIA control CA2 high
   sta via_pcr
@@ -74,48 +74,33 @@ irq:
   lda via_sr ; VIA reset shift register
 btn_check:
   lda via_ifr
-  and #%00000010
+  and #%00000010 ; IRQ: check if CA1 is the source of IRQ (another timer)
   beq exit_irq
-  lda #%00001111 ; BTN: horizontals are high, reading verticals
+  lda #%00001111 ; BTN: horizontals are high and outputing, verticals read
   sta via_dir_a
   sta via_data_a
-  lda via_dir_a
-  and #%11110000
-  beq loopcont
-  lda #%00001111
-  sta via_dir_a
-  sta via_data_a
-loopcont:
   lda via_data_a
-  and #%11110000
-  beq exit_irq
+  and #%11110000 ; BTN: read verticals
   sta btn_state
-  lda #%11110000 
+  lda #%11110000 ; BTN: verticals are high and outputing, horizontals read
   sta via_dir_a
   sta via_data_a
   lda via_data_a
-  and #%00001111
-  beq exit_irq
+  and #%00001111 ; BTN: read horizontals
   ora btn_state
   cmp btn_state_cache
-  beq exit_irq
+  beq reset_irq
+  sta btn_state
+  lda irq_counter
+  inc
+  sta irq_counter
+  cmp #btn_irq_ticks
+  bcc exit_irq
+  lda btn_state
   sta btn_state_cache
-  lda #$09
-  jsr waitms
-  lda via_data_a
-  and #%00001111
   beq exit_irq
-  sta btn_state
-  lda #%00001111 
-  sta via_dir_a
-  sta via_data_a
-  lda via_data_a
-  and #%11110000
-  beq exit_irq
-  ora btn_state
-  cmp btn_state_cache
-  bne exit_irq
-  ldx 0
+  ldx #0
+  stx irq_counter
 btn_loop:
   cmp btninput, X
   beq print_btn_char
@@ -126,12 +111,16 @@ btn_loop:
 print_btn_char:
   lda btnoutput, X
   jsr lcdprint
-  ;;jsr serialoutput
+  jsr serialoutput
   ;;jsr ledhigh
   ;;jsr lcdprintbinary
 exit_irq:
   pla
   rti
+reset_irq:
+  lda #0
+  sta irq_counter
+  jmp exit_irq
 
 ledhigh:
   pha
