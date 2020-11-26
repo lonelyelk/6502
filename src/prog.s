@@ -13,8 +13,11 @@ via_lcd_read .equ %00001110
 
 btn_state_cache .equ $0200
 btn_state .equ $0201
-irq_counter .equ $0210
-lcd_address_counter .equ $0300
+irq_counter .equ $0202
+lcd_address_counter .equ $0203
+lcd_state_dirty .equ $0204
+lcd_address_pointer .equ $0205
+lcd_memory .equ $0300
 
 lcd_control_rs .equ $02
 lcd_control_rw .equ $04
@@ -34,6 +37,7 @@ btn_irq_ticks .equ 3
   .org $8000
 
 reset:
+  sei
   lda via_ier
   ora #%10000010 ; VIA enable CA1 interrupt
   sta via_ier
@@ -45,16 +49,17 @@ reset:
   sta irq_counter
   sta btn_state
   sta btn_state_cache
-  ldx #lcd_chars_number
-printcharsloop:
-  jsr lcdprint
-  inc
-  dex
-  bne printcharsloop
+  sta lcd_address_pointer
+  ldx #0
+  lda #" "
+lcd_clear:
+  sta lcd_memory, x
+  inx
+  cpx #80
+  bne lcd_clear
 
   lda #">"
   jsr lcdprint
-
   cli
 
 loop:
@@ -64,6 +69,9 @@ loop:
 nmi:
 irq:
   pha
+  phx
+  phy
+serial_check:
   lda via_ifr
   and #%00000100 ; IRQ: check if serial port is the source of IRQ (finished data tramsmit, time to pulse latch)
   beq btn_check
@@ -75,7 +83,7 @@ irq:
 btn_check:
   lda via_ifr
   and #%00000010 ; IRQ: check if CA1 is the source of IRQ (another timer)
-  beq exit_irq
+  beq lcd_check
   lda #%00001111 ; BTN: horizontals are high and outputing, verticals read
   sta via_dir_a
   sta via_data_a
@@ -95,10 +103,10 @@ btn_check:
   inc
   sta irq_counter
   cmp #btn_irq_ticks
-  bcc exit_irq
+  bcc lcd_check
   lda btn_state
   sta btn_state_cache
-  beq exit_irq
+  beq lcd_check
   ldx #0
   stx irq_counter
 btn_loop:
@@ -106,21 +114,25 @@ btn_loop:
   beq print_btn_char
   inx
   cpx #btn_num
-  beq exit_irq
+  beq lcd_check
   jmp btn_loop
 print_btn_char:
   lda btnoutput, X
   jsr lcdprint
   jsr serialoutput
-  ;;jsr ledhigh
-  ;;jsr lcdprintbinary
+lcd_check:
+  lda lcd_state_dirty
+  beq exit_irq
+  jsr lcdrefresh
 exit_irq:
+  ply
+  plx
   pla
   rti
 reset_irq:
   lda #0
   sta irq_counter
-  jmp exit_irq
+  jmp lcd_check
 
 ledhigh:
   pha
@@ -234,12 +246,8 @@ setupcharloop:
   dec
   bne setupcharsloop
 
-  lda #lcd_ddram ; LCD: set address counter to DDRAM 00
-  jsr lcdcommandbusy
-
   lda #%00000010 ; LCD: home
   jsr lcdcommandbusy
-
   pla
   rts
 
@@ -327,34 +335,48 @@ lcdwritebusy:
   rts
 
 lcdprint:
-  jsr lcdwritebusy
   pha
-  lda lcd_address_counter
-  cmp #lcd_address_line1_middle
-  beq lcdchangeline12
-  cmp #lcd_address_line2_middle
-  beq lcdchangeline23
-  cmp #lcd_address_line2_start
-  beq lcdchangeline2
-  jmp lcdreturn
-lcdchangeline12:
-  lda #lcd_address_line2_start
-  sta lcd_address_counter
-  ora #lcd_ddram
-  jsr lcdcommandbusy
-  jmp lcdreturn
-lcdchangeline23:
-  lda #lcd_address_line1_middle
-  sta lcd_address_counter
-  ora #lcd_ddram
-  jsr lcdcommandbusy
-  jmp lcdreturn
-lcdchangeline2:
-  lda #lcd_address_line2_middle
-  sta lcd_address_counter
-  ora #lcd_ddram
-  jsr lcdcommandbusy
-lcdreturn:
+  phx
+  ldx lcd_address_pointer
+  sta lcd_memory, x
+  inx
+  cpx #80
+  bne lcdprint_exit
+  ldx #0
+lcdprint_exit:
+  stx lcd_address_pointer
+  lda #1
+  sta lcd_state_dirty
+
+;;  jsr lcdwritebusy
+;;  pha
+;;  lda lcd_address_counter
+;;  cmp #lcd_address_line1_middle
+;;  beq lcdchangeline12
+;;  cmp #lcd_address_line2_middle
+;;  beq lcdchangeline23
+;;  cmp #lcd_address_line2_start
+;;  beq lcdchangeline2
+;;  jmp lcdreturn
+;;lcdchangeline12:
+;;  lda #lcd_address_line2_start
+;;  sta lcd_address_counter
+;;  ora #lcd_ddram
+;;  jsr lcdcommandbusy
+;;  jmp lcdreturn
+;;lcdchangeline23:
+;;  lda #lcd_address_line1_middle
+;;  sta lcd_address_counter
+;;  ora #lcd_ddram
+;;  jsr lcdcommandbusy
+;;  jmp lcdreturn
+;;lcdchangeline2:
+;;  lda #lcd_address_line2_middle
+;;  sta lcd_address_counter
+;;  ora #lcd_ddram
+;;  jsr lcdcommandbusy
+;;lcdreturn:
+  plx
   pla
   rts
 
@@ -410,6 +432,65 @@ lcdbusyloop0:
   pla
   rts
 
+lcdrefresh:
+  pha
+  phx
+  phy
+  lda #%00000010 ; LCD: home
+  jsr lcdcommandbusy
+  ldx #0
+line1:
+  lda lcd_memory, x
+  jsr lcdwritebusy
+  inx
+  cpx #20
+  bne line1
+  ldx #40
+line2:
+  lda lcd_memory, x
+  jsr lcdwritebusy
+  inx
+  cpx #60
+  bne line2
+  ldx #20
+line3:
+  lda lcd_memory, x
+  jsr lcdwritebusy
+  inx
+  cpx #40
+  bne line3
+  ldx #60
+line4:
+  lda lcd_memory, x
+  jsr lcdwritebusy
+  inx
+  cpx #80
+  bne line4
+  lda lcd_address_pointer
+  cmp #20 ;; 0-19 -> 0-19
+  bmi set_cursor
+  cmp #40 ;; 20-39 -> 64-83
+  bmi cursor_line2
+  cmp #60 ;; 40-59 -> 20-39 line shifts AC?
+  bmi cursor_line3
+  adc #23 ;; 60-79 -> 84-93
+set_cursor:
+  ora #lcd_ddram
+  jsr lcdcommandbusy
+  lda #0
+  sta lcd_state_dirty
+  ply
+  plx
+  pla
+  rts
+cursor_line2:
+  adc #44
+  jmp set_cursor
+cursor_line3:
+  sbc #19
+  jmp set_cursor
+
+
 lcdchars:
   .byte %10100 ;; elk
   .byte %10100
@@ -427,7 +508,7 @@ lcdchars:
   .byte %11111
   .byte %10101
   .byte %10101
-  .byte %00100 ;; penis
+  .byte %00100 ;; male
   .byte %01010
   .byte %01110
   .byte %01010
@@ -435,7 +516,7 @@ lcdchars:
   .byte %10101
   .byte %10101
   .byte %01110
-  .byte %01110 ;; vagina
+  .byte %01110 ;; female
   .byte %10001
   .byte %10101
   .byte %10101
