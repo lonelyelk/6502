@@ -1,12 +1,24 @@
-via_data_a .equ $600f
-via_data_b .equ $6000
-via_dir_a .equ $6003
-via_dir_b .equ $6002
-via_sr .equ $600a
-via_acr .equ $600b
-via_pcr .equ $600c
-via_ifr .equ $600d
-via_ier .equ $600e
+;; VIA1 7ff0-7fff
+via1_data_a .equ $7fff
+via1_data_b .equ $7ff0
+via1_dir_a .equ $7ff3
+via1_dir_b .equ $7ff2
+via1_sr .equ $7ffa
+via1_acr .equ $7ffb
+via1_pcr .equ $7ffc
+via1_ifr .equ $7ffd
+via1_ier .equ $7ffe
+
+;; VIA2 7fe0-7fef
+via2_data_a .equ $7fef
+via2_data_b .equ $7fe0
+via2_dir_a .equ $7fe3
+via2_dir_b .equ $7fe2
+via2_sr .equ $7fea
+via2_acr .equ $7feb
+via2_pcr .equ $7fec
+via2_ifr .equ $7fed
+via2_ier .equ $7fee
 
 via_lcd_write .equ %11111110 ; LCD data (4 most significant bits) E, RW, RS
 via_lcd_read .equ %00001110
@@ -38,9 +50,9 @@ btn_irq_ticks .equ 3
 
 reset:
   sei
-  lda via_ier
-  ora #%10000010 ; VIA enable CA1 interrupt
-  sta via_ier
+  lda via1_ier
+  ora #%10010000 ; VIA1 enable CB1 interrupt
+  sta via1_ier
 
   jsr serialsetup
   jsr lcdsetup
@@ -72,28 +84,28 @@ irq:
   phx
   phy
 serial_check:
-  lda via_ifr
+  lda via2_ifr
   and #%00000100 ; IRQ: check if serial port is the source of IRQ (finished data tramsmit, time to pulse latch)
   beq btn_check
-  lda #%1110 ; VIA control CA2 high
-  sta via_pcr
-  lda #%1100 ; VIA control CA2 low
-  sta via_pcr
-  lda via_sr ; VIA reset shift register
+  lda #%1110 ; VIA2 control CA2 high
+  sta via2_pcr
+  lda #%1100 ; VIA2 control CA2 low
+  sta via2_pcr
+  lda via2_sr ; VIA2 reset shift register
 btn_check:
-  lda via_ifr
-  and #%00000010 ; IRQ: check if CA1 is the source of IRQ (another timer)
+  lda via1_ifr
+  and #%00010000 ; IRQ: check if CB1 is the source of IRQ (another timer)
   beq lcd_check
   lda #%00001111 ; BTN: horizontals are high and outputing, verticals read
-  sta via_dir_a
-  sta via_data_a
-  lda via_data_a
+  sta via1_dir_a
+  sta via1_data_a
+  lda via1_data_a
   and #%11110000 ; BTN: read verticals
   sta btn_state
   lda #%11110000 ; BTN: verticals are high and outputing, horizontals read
-  sta via_dir_a
-  sta via_data_a
-  lda via_data_a
+  sta via1_dir_a
+  sta via1_data_a
+  lda via1_data_a
   and #%00001111 ; BTN: read horizontals
   ora btn_state
   cmp btn_state_cache
@@ -136,41 +148,41 @@ reset_irq:
 
 ledhigh:
   pha
-  lda via_data_a
+  lda via1_data_a
   ora #1
-  sta via_data_a
+  sta via1_data_a
   pla
   rts
 
 ledlow:
   pha
-  lda via_data_a
+  lda via1_data_a
   and #%11111110
-  sta via_data_a
+  sta via1_data_a
   pla
   rts
 
 serialsetup:
   pha
-  lda via_sr ; VIA reset shift register
-  lda via_ier
-  ora #%10000100 ; VIA enable shift register interrupt
-  sta via_ier
-  lda via_acr
+  lda via2_sr ; VIA2 reset shift register
+  lda via2_ier
+  ora #%10000100 ; VIA2 enable shift register interrupt
+  sta via2_ier
+  lda via2_acr
   ora #%00011000
-  and #%11111011 ; VIA shift register mode 110
-  sta via_acr
-  lda #%1100 ; VIA control CA2 low
-  sta via_pcr
-  lda #%1110 ; VIA control CA2 high
-  sta via_pcr
-  lda #%1100 ; VIA control CA2 low
-  sta via_pcr
+  and #%11111011 ; VIA2 shift register mode 110
+  sta via2_acr
+  lda #%1100 ; VIA2 control CA2 low
+  sta via2_pcr
+  lda #%1110 ; VIA2 control CA2 high
+  sta via2_pcr
+  lda #%1100 ; VIA2 control CA2 low
+  sta via2_pcr
   pla
   rts
 
 serialoutput:
-  sta via_sr
+  sta via2_sr
   rts
 
 lcdprintbinary:
@@ -198,7 +210,7 @@ shiftloop0:
 lcdsetup:
   pha
   lda #via_lcd_write ; LCD data (4 most significant bits) E, RW, RS
-  sta via_dir_b
+  sta via1_dir_b
 
   lda #$0f ;; wait ~15 ms after powerup
   jsr waitms
@@ -265,11 +277,11 @@ waitloop1:
 lcdcommand8:
   pha
   and #%11110000
-  sta via_data_b
+  sta via1_data_b
   ora #lcd_control_e
-  sta via_data_b
+  sta via1_data_b
   lda #0
-  sta via_data_b
+  sta via1_data_b
   pla
   rts
 
@@ -278,22 +290,22 @@ lcdcommand:
   pha
   and #%11110000
   pha
-  sta via_data_b
+  sta via1_data_b
   ora #lcd_control_e
-  sta via_data_b
+  sta via1_data_b
   pla
-  sta via_data_b
+  sta via1_data_b
   pla
   asl
   asl
   asl
   asl
   pha
-  sta via_data_b
+  sta via1_data_b
   ora #lcd_control_e
-  sta via_data_b
+  sta via1_data_b
   pla
-  sta via_data_b
+  sta via1_data_b
   pla
   rts
 
@@ -313,11 +325,11 @@ lcdwritebusy:
   and #%11110000
   ora #lcd_control_rs
   pha
-  sta via_data_b
+  sta via1_data_b
   ora #lcd_control_e
-  sta via_data_b
+  sta via1_data_b
   pla
-  sta via_data_b
+  sta via1_data_b
   pla
   asl
   asl
@@ -325,11 +337,11 @@ lcdwritebusy:
   asl
   ora #lcd_control_rs
   pha
-  sta via_data_b
+  sta via1_data_b
   ora #lcd_control_e
-  sta via_data_b
+  sta via1_data_b
   pla
-  sta via_data_b
+  sta via1_data_b
   jsr lcdbusy
   pla
   rts
@@ -383,39 +395,39 @@ lcdprint_exit:
 lcdbusy8:
   pha
   lda #via_lcd_read ; LCD allow read from data pins
-  sta via_dir_b
+  sta via1_dir_b
 lcdbusyloop80:
   lda #lcd_control_rw
-  sta via_data_b
+  sta via1_data_b
   ora #lcd_control_e
-  sta via_data_b
-  lda via_data_b
+  sta via1_data_b
+  lda via1_data_b
   and #lcd_busy_flag
   bne lcdbusyloop80
   lda #lcd_control_rw
-  sta via_data_b
+  sta via1_data_b
   lda #via_lcd_write ; LCD make all write only
-  sta via_dir_b
+  sta via1_dir_b
   pla
   rts
 
 lcdbusy:
   pha
   lda #via_lcd_read ; LCD allow read from data pins
-  sta via_dir_b
+  sta via1_dir_b
 lcdbusyloop0:
   lda #lcd_control_rw
-  sta via_data_b
+  sta via1_data_b
   ora #lcd_control_e
-  sta via_data_b
-  lda via_data_b
+  sta via1_data_b
+  lda via1_data_b
   and #%11110000
   sta lcd_address_counter
   lda #lcd_control_rw
-  sta via_data_b
+  sta via1_data_b
   ora #lcd_control_e
-  sta via_data_b
-  lda via_data_b
+  sta via1_data_b
+  lda via1_data_b
   and #%11110000
   ror
   ror
@@ -426,9 +438,9 @@ lcdbusyloop0:
   and #lcd_busy_flag
   bne lcdbusyloop0
   lda #lcd_control_rw
-  sta via_data_b
+  sta via1_data_b
   lda #via_lcd_write ; LCD make all write only
-  sta via_dir_b
+  sta via1_dir_b
   pla
   rts
 
