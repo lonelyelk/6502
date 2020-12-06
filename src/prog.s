@@ -131,6 +131,7 @@ btn_loop:
 print_btn_char:
   lda btnoutput, X
   jsr lcdprint
+  lda leddigitsoutput, X
   jsr serialoutput
 lcd_check:
   lda lcd_state_dirty
@@ -359,35 +360,6 @@ lcdprint_exit:
   stx lcd_address_pointer
   lda #1
   sta lcd_state_dirty
-
-;;  jsr lcdwritebusy
-;;  pha
-;;  lda lcd_address_counter
-;;  cmp #lcd_address_line1_middle
-;;  beq lcdchangeline12
-;;  cmp #lcd_address_line2_middle
-;;  beq lcdchangeline23
-;;  cmp #lcd_address_line2_start
-;;  beq lcdchangeline2
-;;  jmp lcdreturn
-;;lcdchangeline12:
-;;  lda #lcd_address_line2_start
-;;  sta lcd_address_counter
-;;  ora #lcd_ddram
-;;  jsr lcdcommandbusy
-;;  jmp lcdreturn
-;;lcdchangeline23:
-;;  lda #lcd_address_line1_middle
-;;  sta lcd_address_counter
-;;  ora #lcd_ddram
-;;  jsr lcdcommandbusy
-;;  jmp lcdreturn
-;;lcdchangeline2:
-;;  lda #lcd_address_line2_middle
-;;  sta lcd_address_counter
-;;  ora #lcd_ddram
-;;  jsr lcdcommandbusy
-;;lcdreturn:
   plx
   pla
   rts
@@ -604,6 +576,24 @@ btnoutput:
   .byte "d"
   .byte "*"
   .byte "#"
+
+leddigitsoutput:
+  .byte %00010001 ;; 0
+  .byte %11010111 ;; 1
+  .byte %00110010 ;; 2
+  .byte %10010010 ;; 3
+  .byte %11010100 ;; 4
+  .byte %10011000 ;; 5
+  .byte %00011000 ;; 6
+  .byte %11010011 ;; 7
+  .byte %00010000 ;; 8
+  .byte %10010000 ;; 9
+  .byte %01010000 ;; a
+  .byte %00011100 ;; b
+  .byte %00111110 ;; c
+  .byte %00010110 ;; d
+  .byte %11101111 ;; *
+  .byte %00011110 ;; #
 
   .org $fffa
   .word nmi
