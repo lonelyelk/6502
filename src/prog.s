@@ -23,14 +23,6 @@ via2_ier .equ $7fee
 via_lcd_write .equ %11111110 ; LCD data (4 most significant bits) E, RW, RS
 via_lcd_read .equ %00001110
 
-btn_state_cache .equ $0200
-btn_state .equ $0201
-irq_counter .equ $0202
-lcd_address_counter .equ $0203
-lcd_state_dirty .equ $0204
-lcd_address_pointer .equ $0205
-lcd_memory .equ $0300
-
 lcd_control_rs .equ $02
 lcd_control_rw .equ $04
 lcd_control_e .equ $08
@@ -46,6 +38,15 @@ lcd_chars_number .equ $08
 btn_num .equ $10
 btn_irq_ticks .equ 3
 
+;; variables
+btn_state_cache .equ $0200
+btn_state .equ $0201
+irq_counter .equ $0202
+lcd_address_counter .equ $0203
+lcd_state_dirty .equ $0204
+lcd_address_pointer .equ $0205
+lcd_memory .equ $0300
+kbd_input .equ $0400
   .org $8000
 
 reset:
@@ -57,11 +58,15 @@ reset:
   jsr serialsetup
   jsr lcdsetup
 
+  lda #%00001111 ; KBD: columns output, rows input
+  sta via2_dir_a
+
   lda #0
   sta irq_counter
   sta btn_state
   sta btn_state_cache
   sta lcd_address_pointer
+  sta via2_data_a
   ldx #0
   lda #" "
 lcd_clear:
@@ -75,7 +80,9 @@ lcd_clear:
   cli
 
 loop:
-  nop
+  lda lcd_state_dirty
+  beq loop
+  jsr lcdrefresh
   jmp loop
 
 nmi:
@@ -86,66 +93,123 @@ irq:
 serial_check:
   lda via2_ifr
   and #%00000100 ; IRQ: check if serial port is the source of IRQ (finished data tramsmit, time to pulse latch)
-  beq btn_check
+  beq kbd_check
   lda #%1110 ; VIA2 control CA2 high
   sta via2_pcr
   lda #%1100 ; VIA2 control CA2 low
   sta via2_pcr
   lda via2_sr ; VIA2 reset shift register
-btn_check:
+kbd_check:
   lda via1_ifr
   and #%00010000 ; IRQ: check if CB1 is the source of IRQ (another timer)
-  beq lcd_check
-  lda #%00001111 ; BTN: horizontals are high and outputing, verticals read
-  sta via1_dir_a
-  sta via1_data_a
-  lda via1_data_a
-  and #%11110000 ; BTN: read verticals
-  sta btn_state
-  lda #%11110000 ; BTN: verticals are high and outputing, horizontals read
-  sta via1_dir_a
-  sta via1_data_a
-  lda via1_data_a
-  and #%00001111 ; BTN: read horizontals
-  ora btn_state
-  cmp btn_state_cache
-  beq reset_irq
-  sta btn_state
-  lda irq_counter
-  inc
-  sta irq_counter
-  cmp #btn_irq_ticks
-  bcc lcd_check
-  lda btn_state
-  sta btn_state_cache
-  beq lcd_check
-  ldx #0
-  stx irq_counter
-btn_loop:
-  cmp btninput, X
-  beq print_btn_char
-  inx
-  cpx #btn_num
-  beq lcd_check
-  jmp btn_loop
-print_btn_char:
-  lda btnoutput, X
-  jsr lcdprint
-  lda leddigitsoutput, X
-  jsr serialoutput
-lcd_check:
-  lda lcd_state_dirty
   beq exit_irq
-  jsr lcdrefresh
+  lda #%00001000 ; KBD: power columns from left to right: DA0(c1) ror-> DA1(c2) ror-> DA2(c3) ror-> DA3(c4)
+  sta via2_data_a
+  ldx #0
+kbd_loop:
+  pha
+  ldy #4 ;; KBD: start with bottom row
+  lda via2_data_a
+kbd_col_loop: ; KBD read pits for columns from bottom to top: DA4(r1) <-rol DA5(r2) <-rol DA6(r3) <-rol DA7(r4)
+  rol
+  bcc kbd_col_cont
+  clc
+  pha
+  lda #1
+  sta kbd_input, x
+  pla
+  jmp kbd_col_cont1
+kbd_col_cont:
+  pha
+  lda #0
+  sta kbd_input, x
+  pla
+kbd_col_cont1:
+  inx
+  dey
+  bne kbd_col_loop
+  pla
+  ror
+  bcs kbd_loop_exit
+  sta via2_data_a ;; KBD: next column to the left
+  jmp kbd_loop
+kbd_loop_exit:
+  dex
+  clc
+lcd_kbd_state_loop:
+  txa
+  adc #60
+  tay
+  lda kbd_input, x
+  beq lcd_kbd_state_clear
+  lda #"*"
+  sta lcd_memory, y
+  jmp lcd_kbd_state_cont
+lcd_kbd_state_clear:
+  lda #" "
+  sta lcd_memory, y
+lcd_kbd_state_cont:
+  dex
+  bpl lcd_kbd_state_loop
+  lda #1
+  sta lcd_state_dirty
+
+;;btn_check:
+;;  lda #%00001111 ; BTN: horizontals are high and outputing, verticals read
+;;  sta via1_dir_a
+;;  sta via1_data_a
+;;  lda via1_data_a
+;;  and #%11110000 ; BTN: read verticals
+;;  sta btn_state
+;;  lda #%11110000 ; BTN: verticals are high and outputing, horizontals read
+;;  sta via1_dir_a
+;;  sta via1_data_a
+;;  lda via1_data_a
+;;  and #%00001111 ; BTN: read horizontals
+;;  ora btn_state
+;;  cmp btn_state_cache
+;;  beq reset_irq
+;;  sta btn_state
+;;  lda irq_counter
+;;  inc
+;;  sta irq_counter
+;;  cmp #btn_irq_ticks
+;;  bcc lcd_check
+;;  lda btn_state
+;;  sta btn_state_cache
+;;  beq lcd_check
+;;  ldx #0
+;;  stx irq_counter
+;;btn_loop:
+;;  cmp btninput, X
+;;  beq print_btn_char
+;;  inx
+;;  cpx #btn_num
+;;  beq lcd_check
+;;  jmp btn_loop
+
+
+;;;;print_btn_char:
+;;;;  lda btnoutput, X
+;;;;  jsr lcdprint
+;;;;  lda leddigitsoutput, X
+;;;;  jsr serialoutput
+
+
+;;lcd_check:
+;;  lda lcd_state_dirty
+;;  beq exit_irq
+;;  jsr lcdrefresh
 exit_irq:
+  lda via1_data_b
   ply
   plx
   pla
   rti
-reset_irq:
-  lda #0
-  sta irq_counter
-  jmp lcd_check
+;;reset_irq:
+;;  lda #0
+;;  sta irq_counter
+;;  jmp exit_irq
 
 ledhigh:
   pha
@@ -576,6 +640,24 @@ btnoutput:
   .byte "d"
   .byte "*"
   .byte "#"
+
+;;kbd_input:
+;;  .byte "D" ;; D
+;;  .byte "C" ;; C
+;;  .byte "B" ;; B
+;;  .byte "A" ;; A
+;;  .byte "#" ;; #
+;;  .byte 9 ;; 9
+;;  .byte 6 ;; 6
+;;  .byte 3 ;; 3
+;;  .byte 0 ;; 0
+;;  .byte 8 ;; 8
+;;  .byte 5 ;; 5
+;;  .byte 2 ;; 2
+;;  .byte "*" ;; *
+;;  .byte 7 ;; 7
+;;  .byte 4 ;; 4
+;;  .byte 1 ;; 1
 
 leddigitsoutput:
   .byte %00010001 ;; 0
