@@ -57,6 +57,7 @@ reset:
 
   jsr serialsetup
   jsr lcdsetup
+  jsr kbd_setup
 
   lda #%00001111 ; KBD: columns output, rows input
   sta via2_dir_a
@@ -99,7 +100,7 @@ serial_check:
   lda #%1100 ; VIA2 control CA2 low
   sta via2_pcr
   lda via2_sr ; VIA2 reset shift register
-kbd_check:
+kbd_check: ;; KBD: bit flags are: [release ack] [press ack] [press state]
   lda via1_ifr
   and #%00010000 ; IRQ: check if CB1 is the source of IRQ (another timer)
   beq exit_irq
@@ -112,19 +113,22 @@ kbd_loop:
   lda via2_data_a
 kbd_col_loop: ; KBD read pits for columns from bottom to top: DA4(r1) <-rol DA5(r2) <-rol DA6(r3) <-rol DA7(r4)
   rol
-  bcc kbd_col_cont
+  bcc kbd_col_open
   clc
   pha
-  lda #1
+  lda kbd_input, x
+  and #%011
+  ora #%001
   sta kbd_input, x
   pla
-  jmp kbd_col_cont1
-kbd_col_cont:
+  jmp kbd_col_cont
+kbd_col_open:
   pha
-  lda #0
+  lda kbd_input, x
+  and #%100
   sta kbd_input, x
   pla
-kbd_col_cont1:
+kbd_col_cont:
   inx
   dey
   bne kbd_col_loop
@@ -141,53 +145,30 @@ lcd_kbd_state_loop:
   adc #60
   tay
   lda kbd_input, x
-  beq lcd_kbd_state_clear
+  bit #%001
+  beq lcd_kbd_release
+  and #%010
+  bne lcd_kbd_state_cont
+;;lcd_kbd_press:
+  lda #%011
+  sta kbd_input, x
+  lda kbd_values, x
+  jsr lcdprint
   lda #"*"
   sta lcd_memory, y
   jmp lcd_kbd_state_cont
-lcd_kbd_state_clear:
+lcd_kbd_release:
+  and #%100
+  bne lcd_kbd_state_cont
+  lda #%100
+  sta kbd_input, x
   lda #" "
   sta lcd_memory, y
+  lda #1
+  sta lcd_state_dirty
 lcd_kbd_state_cont:
   dex
   bpl lcd_kbd_state_loop
-  lda #1
-  sta lcd_state_dirty
-
-;;btn_check:
-;;  lda #%00001111 ; BTN: horizontals are high and outputing, verticals read
-;;  sta via1_dir_a
-;;  sta via1_data_a
-;;  lda via1_data_a
-;;  and #%11110000 ; BTN: read verticals
-;;  sta btn_state
-;;  lda #%11110000 ; BTN: verticals are high and outputing, horizontals read
-;;  sta via1_dir_a
-;;  sta via1_data_a
-;;  lda via1_data_a
-;;  and #%00001111 ; BTN: read horizontals
-;;  ora btn_state
-;;  cmp btn_state_cache
-;;  beq reset_irq
-;;  sta btn_state
-;;  lda irq_counter
-;;  inc
-;;  sta irq_counter
-;;  cmp #btn_irq_ticks
-;;  bcc lcd_check
-;;  lda btn_state
-;;  sta btn_state_cache
-;;  beq lcd_check
-;;  ldx #0
-;;  stx irq_counter
-;;btn_loop:
-;;  cmp btninput, X
-;;  beq print_btn_char
-;;  inx
-;;  cpx #btn_num
-;;  beq lcd_check
-;;  jmp btn_loop
-
 
 ;;;;print_btn_char:
 ;;;;  lda btnoutput, X
@@ -195,35 +176,23 @@ lcd_kbd_state_cont:
 ;;;;  lda leddigitsoutput, X
 ;;;;  jsr serialoutput
 
-
-;;lcd_check:
-;;  lda lcd_state_dirty
-;;  beq exit_irq
-;;  jsr lcdrefresh
 exit_irq:
   lda via1_data_b
   ply
   plx
   pla
   rti
-;;reset_irq:
-;;  lda #0
-;;  sta irq_counter
-;;  jmp exit_irq
 
-ledhigh:
+kbd_setup:
   pha
-  lda via1_data_a
-  ora #1
-  sta via1_data_a
-  pla
-  rts
-
-ledlow:
-  pha
-  lda via1_data_a
-  and #%11111110
-  sta via1_data_a
+  phx
+  ldx #15
+  lda #0
+kbd_setup_loop
+  sta kbd_input, x
+  dex
+  bpl kbd_setup_loop
+  plx
   pla
   rts
 
@@ -641,23 +610,23 @@ btnoutput:
   .byte "*"
   .byte "#"
 
-;;kbd_input:
-;;  .byte "D" ;; D
-;;  .byte "C" ;; C
-;;  .byte "B" ;; B
-;;  .byte "A" ;; A
-;;  .byte "#" ;; #
-;;  .byte 9 ;; 9
-;;  .byte 6 ;; 6
-;;  .byte 3 ;; 3
-;;  .byte 0 ;; 0
-;;  .byte 8 ;; 8
-;;  .byte 5 ;; 5
-;;  .byte 2 ;; 2
-;;  .byte "*" ;; *
-;;  .byte 7 ;; 7
-;;  .byte 4 ;; 4
-;;  .byte 1 ;; 1
+kbd_values:
+  .byte "D" ;; D
+  .byte "C" ;; C
+  .byte "B" ;; B
+  .byte "A" ;; A
+  .byte "#" ;; #
+  .byte 9 ;; 9
+  .byte 6 ;; 6
+  .byte 3 ;; 3
+  .byte 0 ;; 0
+  .byte 8 ;; 8
+  .byte 5 ;; 5
+  .byte 2 ;; 2
+  .byte "*" ;; *
+  .byte 7 ;; 7
+  .byte 4 ;; 4
+  .byte 1 ;; 1
 
 leddigitsoutput:
   .byte %00010001 ;; 0
