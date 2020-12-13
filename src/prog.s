@@ -45,8 +45,13 @@ irq_counter .equ $0202
 lcd_address_counter .equ $0203
 lcd_state_dirty .equ $0204
 lcd_address_pointer .equ $0205
-lcd_memory .equ $0300
-kbd_input .equ $0400
+lcd_memory .equ $0300 ; 20x4 bytes
+kbd_input .equ $0400 ; 16 bytes
+
+value .equ $0500 ; 2 bytes
+mod10 .equ $0502 ; 2 bytes
+result .equ $0504 ; 6 bytes
+
   .org $8000
 
 reset:
@@ -78,6 +83,64 @@ lcd_clear:
 
   lda #">"
   jsr lcdprint
+
+  lda #0
+  sta result
+; Initialize value
+  lda number
+  sta value
+  lda number + 1
+  sta value + 1
+
+divide:
+; Initialize remainder
+  lda #0
+  sta mod10
+  sta mod10 + 1
+  clc
+
+  ldx #16
+divloop:
+; Rotate quoitient adn remainder
+  rol value
+  rol value + 1
+  rol mod10
+  rol mod10 + 1
+
+; a,y = dividend - divisor
+  sec
+  lda mod10
+  sbc #10
+  tay ; save low byte in Y
+  lda mod10 + 1
+  sbc #0
+  bcc ignore_result ; branch if dividend < divisor
+  sty mod10
+  sta mod10 + 1
+
+ignore_result:
+  dex
+  bne divloop
+  rol value
+  rol value + 1
+
+  lda mod10
+  clc
+  adc #"0"
+  jsr push_char
+
+  lda value
+  ora value + 1
+  bne divide ; branch if value != 0
+
+  ldx #0
+printresult:
+  lda result, x
+  beq loop
+  jsr lcdprint
+  inx
+  jmp printresult
+
   cli
 
 loop:
@@ -85,6 +148,24 @@ loop:
   beq loop
   jsr lcdrefresh
   jmp loop
+
+; Add character to the beginning of result
+push_char:
+  pha
+  ldy #0
+
+char_loop:
+  lda result, y
+  tax
+  pla
+  sta result, y
+  iny
+  txa
+  pha
+  bne char_loop
+  pla
+  sta result, y
+  rts
 
 nmi:
 irq:
@@ -507,6 +588,8 @@ cursor_line3:
   sbc #19
   jmp set_cursor
 
+number:
+  .word 1729
 
 lcdchars:
   .byte %10100 ;; elk
