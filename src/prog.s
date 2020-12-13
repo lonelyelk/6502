@@ -136,10 +136,11 @@ ignore_result:
   ldx #0
 printresult:
   lda result, x
-  beq loop
+  beq divide_exit
   jsr lcdprint
   inx
   jmp printresult
+divide_exit:
 
   cli
 
