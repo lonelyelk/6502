@@ -49,7 +49,7 @@ lcd_memory .equ $0300 ; 20x4 bytes
 kbd_input .equ $0400 ; 16 bytes
 
 value .equ $0500 ; 2 bytes
-mod10 .equ $0502 ; 2 bytes
+modulo .equ $0502 ; 2 bytes
 result .equ $0504 ; 6 bytes
 
   .org $8000
@@ -74,6 +74,7 @@ reset:
   sta lcd_address_pointer
   sta via2_data_a
   ldx #0
+  txs
   lda #" "
 lcd_clear:
   sta lcd_memory, x
@@ -91,56 +92,7 @@ lcd_clear:
   sta value
   lda number + 1
   sta value + 1
-
-divide:
-; Initialize remainder
-  lda #0
-  sta mod10
-  sta mod10 + 1
-  clc
-
-  ldx #16
-divloop:
-; Rotate quoitient adn remainder
-  rol value
-  rol value + 1
-  rol mod10
-  rol mod10 + 1
-
-; a,y = dividend - divisor
-  sec
-  lda mod10
-  sbc #10
-  tay ; save low byte in Y
-  lda mod10 + 1
-  sbc #0
-  bcc ignore_result ; branch if dividend < divisor
-  sty mod10
-  sta mod10 + 1
-
-ignore_result:
-  dex
-  bne divloop
-  rol value
-  rol value + 1
-
-  lda mod10
-  clc
-  adc #"0"
-  jsr push_char
-
-  lda value
-  ora value + 1
-  bne divide ; branch if value != 0
-
-  ldx #0
-printresult:
-  lda result, x
-  beq divide_exit
-  jsr lcdprint
-  inx
-  jmp printresult
-divide_exit:
+  jsr divide
 
   cli
 
@@ -150,12 +102,71 @@ loop:
   jsr lcdrefresh
   jmp loop
 
+;; Divide value 2 byte number by 10 and output to LCD
+divide:
+  pha
+  phx
+  phy
+divide_loop:
+; Initialize remainder
+  lda #0
+  sta modulo
+  sta modulo + 1
+  clc
+
+  ldx #16
+divide_loop1:
+; Rotate quoitient adn remainder
+  rol value
+  rol value + 1
+  rol modulo
+  rol modulo + 1
+
+; a,y = dividend - divisor
+  sec
+  lda modulo
+  sbc #10
+  tay ; save low byte in Y
+  lda modulo + 1
+  sbc #0
+  bcc ignore_result ; branch if dividend < divisor
+  sty modulo
+  sta modulo + 1
+
+ignore_result:
+  dex
+  bne divide_loop1
+  rol value
+  rol value + 1
+
+  lda modulo
+  clc
+  adc #"0"
+  jsr push_char
+
+  lda value
+  ora value + 1
+  bne divide_loop ; branch if value != 0
+
+  ldx #0
+printresult:
+  lda result, x
+  beq divide_exit
+  jsr lcdprint
+  inx
+  jmp printresult
+divide_exit:
+  ply
+  plx
+  pla
+  rts
+
 ; Add character to the beginning of result
 push_char:
   pha
   ldy #0
 
-char_loop:
+push_char_loop:
   lda result, y
   tax
   pla
@@ -163,107 +174,10 @@ char_loop:
   iny
   txa
   pha
-  bne char_loop
+  bne push_char_loop
   pla
   sta result, y
   rts
-
-nmi:
-irq:
-  pha
-  phx
-  phy
-serial_check:
-  lda via2_ifr
-  and #%00000100 ; IRQ: check if serial port is the source of IRQ (finished data tramsmit, time to pulse latch)
-  beq kbd_check
-  lda #%1110 ; VIA2 control CA2 high
-  sta via2_pcr
-  lda #%1100 ; VIA2 control CA2 low
-  sta via2_pcr
-  lda via2_sr ; VIA2 reset shift register
-kbd_check: ;; KBD: bit flags are: [release ack] [press ack] [press state]
-  lda via1_ifr
-  and #%00010000 ; IRQ: check if CB1 is the source of IRQ (another timer)
-  beq exit_irq
-  lda #%00001000 ; KBD: power columns from left to right: DA0(c1) ror-> DA1(c2) ror-> DA2(c3) ror-> DA3(c4)
-  sta via2_data_a
-  ldx #0
-kbd_loop:
-  pha
-  ldy #4 ;; KBD: start with bottom row
-  lda via2_data_a
-kbd_col_loop: ; KBD read pits for columns from bottom to top: DA4(r1) <-rol DA5(r2) <-rol DA6(r3) <-rol DA7(r4)
-  rol
-  bcc kbd_col_open
-  clc
-  pha
-  lda kbd_input, x
-  and #%011
-  ora #%001
-  sta kbd_input, x
-  pla
-  jmp kbd_col_cont
-kbd_col_open:
-  pha
-  lda kbd_input, x
-  and #%100
-  sta kbd_input, x
-  pla
-kbd_col_cont:
-  inx
-  dey
-  bne kbd_col_loop
-  pla
-  ror
-  bcs kbd_loop_exit
-  sta via2_data_a ;; KBD: next column to the left
-  jmp kbd_loop
-kbd_loop_exit:
-  dex
-  clc
-lcd_kbd_state_loop:
-  txa
-  adc #60
-  tay
-  lda kbd_input, x
-  bit #%001
-  beq lcd_kbd_release
-  and #%010
-  bne lcd_kbd_state_cont
-;;lcd_kbd_press:
-  lda #%011
-  sta kbd_input, x
-  lda kbd_values, x
-  jsr lcdprint
-  lda #"*"
-  sta lcd_memory, y
-  jmp lcd_kbd_state_cont
-lcd_kbd_release:
-  and #%100
-  bne lcd_kbd_state_cont
-  lda #%100
-  sta kbd_input, x
-  lda #" "
-  sta lcd_memory, y
-  lda #1
-  sta lcd_state_dirty
-lcd_kbd_state_cont:
-  dex
-  bpl lcd_kbd_state_loop
-
-;;;;print_btn_char:
-;;;;  lda btnoutput, X
-;;;;  jsr lcdprint
-;;;;  lda leddigitsoutput, X
-;;;;  jsr serialoutput
-
-exit_irq:
-  lda via1_data_b
-  ply
-  plx
-  pla
-  rti
 
 kbd_setup:
   pha
@@ -589,8 +503,107 @@ cursor_line3:
   sbc #19
   jmp set_cursor
 
+;; Interrupt
+nmi:
+irq:
+  pha
+  phx
+  phy
+serial_check:
+  lda via2_ifr
+  and #%00000100 ; IRQ: check if serial port is the source of IRQ (finished data tramsmit, time to pulse latch)
+  beq kbd_check
+  lda #%1110 ; VIA2 control CA2 high
+  sta via2_pcr
+  lda #%1100 ; VIA2 control CA2 low
+  sta via2_pcr
+  lda via2_sr ; VIA2 reset shift register
+kbd_check: ;; KBD: bit flags are: [release ack] [press ack] [press state]
+  lda via1_ifr
+  and #%00010000 ; IRQ: check if CB1 is the source of IRQ (another timer)
+  beq exit_irq
+  lda #%00001000 ; KBD: power columns from left to right: DA0(c1) ror-> DA1(c2) ror-> DA2(c3) ror-> DA3(c4)
+  sta via2_data_a
+  ldx #0
+kbd_loop:
+  pha
+  ldy #4 ;; KBD: start with bottom row
+  lda via2_data_a
+kbd_col_loop: ; KBD read pits for columns from bottom to top: DA4(r1) <-rol DA5(r2) <-rol DA6(r3) <-rol DA7(r4)
+  rol
+  bcc kbd_col_open
+  clc
+  pha
+  lda kbd_input, x
+  and #%011
+  ora #%001
+  sta kbd_input, x
+  pla
+  jmp kbd_col_cont
+kbd_col_open:
+  pha
+  lda kbd_input, x
+  and #%100
+  sta kbd_input, x
+  pla
+kbd_col_cont:
+  inx
+  dey
+  bne kbd_col_loop
+  pla
+  ror
+  bcs kbd_loop_exit
+  sta via2_data_a ;; KBD: next column to the left
+  jmp kbd_loop
+kbd_loop_exit:
+  dex
+  clc
+lcd_kbd_state_loop:
+  txa
+  adc #60
+  tay
+  lda kbd_input, x
+  bit #%001
+  beq lcd_kbd_release
+  and #%010
+  bne lcd_kbd_state_cont
+;;lcd_kbd_press:
+  lda #%011
+  sta kbd_input, x
+  lda kbd_values, x
+  jsr lcdprint
+  lda #"*"
+  sta lcd_memory, y
+  jmp lcd_kbd_state_cont
+lcd_kbd_release:
+  and #%100
+  bne lcd_kbd_state_cont
+  lda #%100
+  sta kbd_input, x
+  lda #" "
+  sta lcd_memory, y
+  lda #1
+  sta lcd_state_dirty
+lcd_kbd_state_cont:
+  dex
+  bpl lcd_kbd_state_loop
+
+;;;;print_btn_char:
+;;;;  lda btnoutput, X
+;;;;  jsr lcdprint
+;;;;  lda leddigitsoutput, X
+;;;;  jsr serialoutput
+
+exit_irq:
+  lda via1_data_b
+  ply
+  plx
+  pla
+  rti
+;; End of interrupt
+
 number:
-  .word 1729
+  .word 2739
 
 lcdchars:
   .byte %10100 ;; elk
@@ -657,42 +670,6 @@ lcdchars:
   .byte %11111
   .byte %01001
   .byte %11011
-
-btninput:
-  .byte %00101000 ;; 0
-  .byte %00010001 ;; 1
-  .byte %00100001 ;; 2
-  .byte %01000001 ;; 3
-  .byte %00010010 ;; 4
-  .byte %00100010 ;; 5
-  .byte %01000010 ;; 6
-  .byte %00010100 ;; 7
-  .byte %00100100 ;; 8
-  .byte %01000100 ;; 9
-  .byte %10000001 ;; a
-  .byte %10000010 ;; b
-  .byte %10000100 ;; c
-  .byte %10001000 ;; d
-  .byte %00011000 ;; *
-  .byte %01001000 ;; #
-
-btnoutput:
-  .byte "0"
-  .byte "1"
-  .byte "2"
-  .byte "3"
-  .byte "4"
-  .byte "5"
-  .byte "6"
-  .byte "7"
-  .byte "8"
-  .byte "9"
-  .byte "a"
-  .byte "b"
-  .byte "c"
-  .byte "d"
-  .byte "*"
-  .byte "#"
 
 kbd_values:
   .byte "D" ;; D
