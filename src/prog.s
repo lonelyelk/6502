@@ -47,7 +47,8 @@ lcd_state_dirty .equ $0204
 lcd_address_pointer .equ $0205
 lcd_memory .equ $0300 ; 20x4 bytes
 kbd_input .equ $0350 ; 16 bytes
-buffer .equ $0360 ; 15x4x4
+kbd_layout .equ $0360 ; 16 bytes
+;;buffer .equ $0360 ; 15x4x4
 
 value .equ $0500 ; 2 bytes
 modulo .equ $0502 ; 2 bytes
@@ -184,9 +185,11 @@ kbd_setup:
   pha
   phx
   ldx #15
-  lda #0
 kbd_setup_loop
+  lda #0
   sta kbd_input, x
+  lda kbd_values1, x
+  sta kbd_layout, x
   dex
   bpl kbd_setup_loop
   plx
@@ -580,7 +583,7 @@ lcd_kbd_release:
   lda #%100
   sta kbd_input, x
   ldy kbd_display, x
-  lda kbd_values1, x
+  lda kbd_layout, x
   sta lcd_memory, y
   lda #1
   sta lcd_state_dirty
@@ -688,9 +691,13 @@ lcdchars:
 ;  .byte 7 ;; 7
 ;  .byte 4 ;; 4
 ;  .byte 1 ;; 1
+kbd_addresses:
+  .word kbd_values1
+  .word kbd_values2
+
 kbd_values1:
   .byte "R"
-  .byte 175
+  .byte "-"
   .byte "*"
   .byte "+"
   .byte 235
@@ -701,15 +708,15 @@ kbd_values1:
   .byte "8"
   .byte "5"
   .byte "2"
-  .byte 235
+  .byte 175
   .byte "7"
   .byte "4"
   .byte "1"
 kbd_values2:
-  .byte "R"
-  .byte 175
-  .byte "*"
-  .byte "+"
+  .byte 248
+  .byte 239
+  .byte 248
+  .byte 248
   .byte 235
   .byte "9"
   .byte 6
@@ -718,7 +725,7 @@ kbd_values2:
   .byte 8
   .byte 5
   .byte 2
-  .byte 235
+  .byte 175
   .byte 7
   .byte 4
   .byte 1
