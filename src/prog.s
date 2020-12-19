@@ -46,7 +46,8 @@ lcd_address_counter .equ $0203
 lcd_state_dirty .equ $0204
 lcd_address_pointer .equ $0205
 lcd_memory .equ $0300 ; 20x4 bytes
-kbd_input .equ $0400 ; 16 bytes
+kbd_input .equ $0350 ; 16 bytes
+buffer .equ $0360 ; 15x4x4
 
 value .equ $0500 ; 2 bytes
 modulo .equ $0502 ; 2 bytes
@@ -559,9 +560,6 @@ kbd_loop_exit:
   dex
   clc
 lcd_kbd_state_loop:
-  txa
-  adc #60
-  tay
   lda kbd_input, x
   bit #%001
   beq lcd_kbd_release
@@ -570,17 +568,19 @@ lcd_kbd_state_loop:
 ;;lcd_kbd_press:
   lda #%011
   sta kbd_input, x
-  lda kbd_values, x
-  jsr lcdprint
-  lda #"*"
+  ldy kbd_display, x
+  lda #255
   sta lcd_memory, y
+  lda #1
+  sta lcd_state_dirty
   jmp lcd_kbd_state_cont
 lcd_kbd_release:
   and #%100
   bne lcd_kbd_state_cont
   lda #%100
   sta kbd_input, x
-  lda #" "
+  ldy kbd_display, x
+  lda kbd_values1, x
   sta lcd_memory, y
   lda #1
   sta lcd_state_dirty
@@ -671,23 +671,76 @@ lcdchars:
   .byte %01001
   .byte %11011
 
-kbd_values:
-  .byte "D" ;; D
-  .byte "C" ;; C
-  .byte "B" ;; B
-  .byte "A" ;; A
-  .byte "#" ;; #
-  .byte 9 ;; 9
-  .byte 6 ;; 6
-  .byte 3 ;; 3
-  .byte 0 ;; 0
-  .byte 8 ;; 8
-  .byte 5 ;; 5
-  .byte 2 ;; 2
-  .byte "*" ;; *
-  .byte 7 ;; 7
-  .byte 4 ;; 4
-  .byte 1 ;; 1
+;kbd_values:
+;  .byte "D" ;; D
+;  .byte "C" ;; C
+;  .byte "B" ;; B
+;  .byte "A" ;; A
+;  .byte "#" ;; #
+;  .byte 9 ;; 9
+;  .byte 6 ;; 6
+;  .byte 3 ;; 3
+;  .byte 0 ;; 0
+;  .byte 8 ;; 8
+;  .byte 5 ;; 5
+;  .byte 2 ;; 2
+;  .byte "*" ;; *
+;  .byte 7 ;; 7
+;  .byte 4 ;; 4
+;  .byte 1 ;; 1
+kbd_values1:
+  .byte "R"
+  .byte 175
+  .byte "*"
+  .byte "+"
+  .byte 235
+  .byte "9"
+  .byte "6"
+  .byte "3"
+  .byte "0"
+  .byte "8"
+  .byte "5"
+  .byte "2"
+  .byte 235
+  .byte "7"
+  .byte "4"
+  .byte "1"
+kbd_values2:
+  .byte "R"
+  .byte 175
+  .byte "*"
+  .byte "+"
+  .byte 235
+  .byte "9"
+  .byte 6
+  .byte 3
+  .byte 0
+  .byte 8
+  .byte 5
+  .byte 2
+  .byte 235
+  .byte 7
+  .byte 4
+  .byte 1
+
+kbd_display:
+  .byte 79
+  .byte 59
+  .byte 39
+  .byte 19
+  .byte 78
+  .byte 58
+  .byte 38
+  .byte 18
+  .byte 77
+  .byte 57
+  .byte 37
+  .byte 17
+  .byte 76
+  .byte 56
+  .byte 36
+  .byte 16
+
 
 leddigitsoutput:
   .byte %00010001 ;; 0
