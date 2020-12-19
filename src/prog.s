@@ -48,6 +48,7 @@ lcd_address_pointer .equ $0205
 lcd_memory .equ $0300 ; 20x4 bytes
 kbd_input .equ $0350 ; 16 bytes
 kbd_layout .equ $0360 ; 16 bytes
+kbd_layout_active .equ $0370 ; 1 byte
 ;;buffer .equ $0360 ; 15x4x4
 
 value .equ $0500 ; 2 bytes
@@ -99,9 +100,68 @@ lcd_clear:
   cli
 
 loop:
+  lda kbd_input + 12 ;; if key12 is pressed activate layout 1 else layout 0
+  bit #1
+  beq loop_layout0
+; layout1
+  lda kbd_layout_active
+  bne loop_lcd
+  ldx #15 ;; copy values1 to RAM KBD layout
+loop_loop_layout1:
+  lda kbd_values1, x
+  sta kbd_layout, x
+  ldy kbd_display, x
+  lda kbd_input, x
+  bit #1
+  beq loop_layout1_released
+  lda #255
+  sta lcd_memory, y
+  jmp loop_loop_layout1_cont
+loop_layout1_released:
+  lda kbd_layout, x
+  sta lcd_memory, y
+loop_loop_layout1_cont:
+  dex
+  bpl loop_loop_layout1
+  lda #1
+  sta kbd_layout_active
+  sta lcd_state_dirty
+  jmp loop_lcd
+loop_layout0:
+  lda kbd_layout_active
+  beq loop_lcd
+  ldx #15 ;; copy values0 to RAM KBD layout
+loop_loop_layout0:
+  lda kbd_values0, x
+  sta kbd_layout, x
+  ldy kbd_display, x
+  lda kbd_input, x
+  bit #1
+  beq loop_layout0_released
+  lda #255
+  sta lcd_memory, y
+  jmp loop_loop_layout0_cont
+loop_layout0_released:
+  lda kbd_layout, x
+  sta lcd_memory, y
+loop_loop_layout0_cont:
+  dex
+  bpl loop_loop_layout0
+  lda #0
+  sta kbd_layout_active
+  lda #1
+  sta lcd_state_dirty
+loop_lcd_kbd_layout_display:
+  sta kbd_input, x
+  ldy kbd_display, x
+  lda kbd_layout, x
+  sta lcd_memory, y
+
+loop_lcd:
   lda lcd_state_dirty
-  beq loop
+  beq loop_end
   jsr lcdrefresh
+loop_end:
   jmp loop
 
 ;; Divide value 2 byte number by 10 and output to LCD
@@ -185,11 +245,13 @@ kbd_setup:
   pha
   phx
   ldx #15
+  lda #0
+  sta kbd_layout_active
 kbd_setup_loop
+  lda kbd_values0, x
+  sta kbd_layout, x
   lda #0
   sta kbd_input, x
-  lda kbd_values1, x
-  sta kbd_layout, x
   dex
   bpl kbd_setup_loop
   plx
@@ -674,28 +736,7 @@ lcdchars:
   .byte %01001
   .byte %11011
 
-;kbd_values:
-;  .byte "D" ;; D
-;  .byte "C" ;; C
-;  .byte "B" ;; B
-;  .byte "A" ;; A
-;  .byte "#" ;; #
-;  .byte 9 ;; 9
-;  .byte 6 ;; 6
-;  .byte 3 ;; 3
-;  .byte 0 ;; 0
-;  .byte 8 ;; 8
-;  .byte 5 ;; 5
-;  .byte 2 ;; 2
-;  .byte "*" ;; *
-;  .byte 7 ;; 7
-;  .byte 4 ;; 4
-;  .byte 1 ;; 1
-kbd_addresses:
-  .word kbd_values1
-  .word kbd_values2
-
-kbd_values1:
+kbd_values0:
   .byte "R"
   .byte "-"
   .byte "*"
@@ -712,7 +753,7 @@ kbd_values1:
   .byte "7"
   .byte "4"
   .byte "1"
-kbd_values2:
+kbd_values1:
   .byte 248
   .byte 239
   .byte 248
