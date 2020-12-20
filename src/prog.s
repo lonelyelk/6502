@@ -151,12 +151,6 @@ loop_loop_layout0_cont:
   sta kbd_layout_active
   lda #1
   sta lcd_state_dirty
-loop_lcd_kbd_layout_display:
-  sta kbd_input, x
-  ldy kbd_display, x
-  lda kbd_layout, x
-  sta lcd_memory, y
-
 loop_lcd:
   lda lcd_state_dirty
   beq loop_end
